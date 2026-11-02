@@ -2,15 +2,16 @@ import { NextRequest, NextResponse } from 'next/server';
 import { createClient } from '@supabase/supabase-js';
 import { GoogleGenAI } from '@google/genai';
 
-const supabase = createClient(
-  process.env.NEXT_PUBLIC_SUPABASE_URL!,
-  process.env.SUPABASE_SERVICE_ROLE_KEY!
-);
+const SUPABASE_URL = (process.env.NEXT_PUBLIC_SUPABASE_URL || 'https://loilpsnetdmnkcnxbgvf.supabase.co').trim();
+const SUPABASE_KEY = (process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || '').trim();
+const GEMINI_KEY = (process.env.GEMINI_API_KEY || '').trim();
+const BOT_TOKEN = (process.env.TELEGRAM_BOT_TOKEN || '').trim();
+const ALLOWED_USER_ID = Number((process.env.MY_TELEGRAM_ID || '6459052188').trim());
+const rawAppUrl = (process.env.NEXT_PUBLIC_APP_URL || '').trim();
+const APP_URL = rawAppUrl.startsWith('https://') ? rawAppUrl : 'https://mutolaa-tracker.vercel.app';
 
-const ai = new GoogleGenAI({ apiKey: process.env.GEMINI_API_KEY! });
-const BOT_TOKEN = process.env.TELEGRAM_BOT_TOKEN!;
-const ALLOWED_USER_ID = Number(process.env.MY_TELEGRAM_ID!);
-const APP_URL = process.env.NEXT_PUBLIC_APP_URL || 'https://mutolaa-tracker.vercel.app';
+const supabase = createClient(SUPABASE_URL, SUPABASE_KEY);
+const ai = new GoogleGenAI({ apiKey: GEMINI_KEY });
 
 // Progress-bar chizish funksiyasi
 function drawBar(current: number, total: number) {
@@ -21,7 +22,8 @@ function drawBar(current: number, total: number) {
 }
 
 async function sendTelegram(chatId: number, text: string) {
-  const res = await fetch(`https://api.telegram.org/bot${BOT_TOKEN}/sendMessage`, {
+  const url = `https://api.telegram.org/bot${BOT_TOKEN}/sendMessage`;
+  const res = await fetch(url, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({
@@ -35,10 +37,23 @@ async function sendTelegram(chatId: number, text: string) {
       }
     }),
   });
+  const data = await res.json().catch(() => ({}));
   if (!res.ok) {
-    const errText = await res.text();
-    console.error('Telegram sendMessage error:', errText);
+    console.error('Telegram sendMessage error:', data);
+    // Fallback without reply_markup/HTML if button or HTML caused failure
+    const retryRes = await fetch(url, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        chat_id: chatId,
+        text,
+        parse_mode: 'HTML',
+      }),
+    });
+    const retryData = await retryRes.json().catch(() => ({}));
+    return { ok: retryRes.ok, status: retryRes.status, error: data.description, retryError: retryData.description };
   }
+  return { ok: true, status: res.status, message_id: data?.result?.message_id };
 }
 
 export async function POST(req: NextRequest) {
@@ -46,8 +61,11 @@ export async function POST(req: NextRequest) {
   try {
     const update = await req.json();
     const msg = update.message;
-    if (!msg || (ALLOWED_USER_ID && msg.from?.id !== ALLOWED_USER_ID)) {
-      return NextResponse.json({ ok: true });
+    if (!msg) {
+      return NextResponse.json({ ok: true, reason: 'no_message' });
+    }
+    if (ALLOWED_USER_ID && msg.from?.id !== ALLOWED_USER_ID) {
+      return NextResponse.json({ ok: true, reason: 'unauthorized_user', fromId: msg.from?.id, allowedId: ALLOWED_USER_ID });
     }
 
     chatId = msg.chat.id;
@@ -60,18 +78,18 @@ export async function POST(req: NextRequest) {
       .order('track');
 
     if (dbError) {
-      await sendTelegram(
+      const tg = await sendTelegram(
         chatId!,
-        `⚠️ <b>Ma'lumotlar bazasiga (Supabase) ulanib bo‘lmadi!</b>\n\nSababi: Supabase loyihangiz "Paused" (uyqu) rejimiga tushib qolgan.\n👉 <a href="https://supabase.com/dashboard">Supabase Dashboard</a> ga kirib loyihani <b>Restore / Unpause</b> qiling.`
+        `⚠️ <b>Ma'lumotlar bazasiga (Supabase) ulanib bo‘lmadi!</b>\n\nXato: <code>${dbError.message}</code>`
       );
-      return NextResponse.json({ ok: true });
+      return NextResponse.json({ ok: true, step: 'db_error', dbError: dbError.message, tg });
     }
 
     // /status buyrug'i
-    if (msg.text === '/status' || msg.text === '/start') {
+    if (msg.text?.startsWith('/status') || msg.text?.startsWith('/start')) {
       if (!activeBooks || activeBooks.length === 0) {
-        await sendTelegram(chatId!, '📚 Hozircha aktiv kitoblar topilmadi.');
-        return NextResponse.json({ ok: true });
+        const tg = await sendTelegram(chatId!, '📚 Hozircha aktiv kitoblar topilmadi.');
+        return NextResponse.json({ ok: true, step: 'status_empty', tg });
       }
       const lines = activeBooks.map((b) => {
         const icon = b.track === 'audio' ? '🎧' : b.track === 'cat_a' ? '📗' : b.track === 'cat_b' ? '🕌' : '🔄';
@@ -79,12 +97,12 @@ export async function POST(req: NextRequest) {
         const modeTag = b.reading_mode === 'phone' ? ' 📱(PDF)' : '';
         return `${icon} <b>${b.title}</b>${modeTag}\n<code>${drawBar(b.current_value, b.total_value)}</code> (${unitLabel})`;
       });
-      await sendTelegram(chatId!, `<b>📚 Hozirgi Aktiv Mutolaa:</b>\n\n${lines.join('\n\n')}`);
-      return NextResponse.json({ ok: true });
+      const tg = await sendTelegram(chatId!, `<b>📚 Hozirgi Aktiv Mutolaa:</b>\n\n${lines.join('\n\n')}`);
+      return NextResponse.json({ ok: true, step: 'status_sent', count: activeBooks.length, tg });
     }
 
     // /savollar buyrug'i — Ustozdan so'raladigan barcha ochiq savollar
-    if (msg.text === '/savollar') {
+    if (msg.text?.startsWith('/savollar')) {
       const { data: qList } = await supabase
         .from('book_notes')
         .select('*, books(title)')
@@ -92,12 +110,12 @@ export async function POST(req: NextRequest) {
         .eq('is_resolved', false);
 
       if (!qList?.length) {
-        await sendTelegram(chatId!, '✅ Hozircha ustozdan so‘raladigan ochiq savollar yo‘q.');
-        return NextResponse.json({ ok: true });
+        const tg = await sendTelegram(chatId!, '✅ Hozircha ustozdan so‘raladigan ochiq savollar yo‘q.');
+        return NextResponse.json({ ok: true, step: 'savollar_empty', tg });
       }
       const text = qList.map((q, i) => `${i + 1}. <b>${q.books?.title || 'Kitob'}</b> (${q.reference_point || '-'}):\n<i>"${q.content}"</i>`).join('\n\n');
-      await sendTelegram(chatId!, `<b>❓ Ustozdan so‘raladigan masalalar:</b>\n\n${text}`);
-      return NextResponse.json({ ok: true });
+      const tg = await sendTelegram(chatId!, `<b>❓ Ustozdan so‘raladigan masalalar:</b>\n\n${text}`);
+      return NextResponse.json({ ok: true, step: 'savollar_sent', tg });
     }
 
     // 2. Matn yoki Ovozli xabarni Gemini orqali JSON ga aylantirish
@@ -114,7 +132,7 @@ export async function POST(req: NextRequest) {
     } else if (msg.text) {
       contents.push(msg.text);
     } else {
-      return NextResponse.json({ ok: true });
+      return NextResponse.json({ ok: true, step: 'unsupported_msg' });
     }
 
     const systemPrompt = `
@@ -156,8 +174,8 @@ export async function POST(req: NextRequest) {
     const targetBook = activeBooks?.find((b) => b.id === parsed.book_id);
 
     if (!targetBook) {
-      await sendTelegram(chatId!, '⚠️ Qaysi kitob ekanligini aniqlay olmadim. Kitob nomini aniqroq ayting.');
-      return NextResponse.json({ ok: true });
+      const tg = await sendTelegram(chatId!, '⚠️ Qaysi kitob ekanligini aniqlay olmadim. Kitob nomini aniqroq ayting.');
+      return NextResponse.json({ ok: true, step: 'book_not_found', parsed, tg });
     }
 
     // 3A. QAYD YOKI USTOZGA SAVOL QO'SHISH
@@ -169,8 +187,8 @@ export async function POST(req: NextRequest) {
         content: parsed.note_content,
       });
       const badge = parsed.note_type === 'ustozga_savol' ? '❓ #ustozga_savol' : parsed.note_type === 'lugat' ? '📖 #lugat' : '💡 #xulosa';
-      await sendTelegram(chatId!, `✅ <b>${targetBook.title}</b> bo‘yicha saqlandi (${badge}):\n\n📍 <b>Joyi:</b> ${parsed.reference_point || 'Ko‘rsatilmadi'}\n📝 <i>"${parsed.note_content}"</i>`);
-      return NextResponse.json({ ok: true });
+      const tg = await sendTelegram(chatId!, `✅ <b>${targetBook.title}</b> bo‘yicha saqlandi (${badge}):\n\n📍 <b>Joyi:</b> ${parsed.reference_point || 'Ko‘rsatilmadi'}\n📝 <i>"${parsed.note_content}"</i>`);
+      return NextResponse.json({ ok: true, step: 'note_saved', tg });
     }
 
     // 3B. PROGRESS YANGILASH VA AVTOMATIK NAVBAT
@@ -217,15 +235,17 @@ export async function POST(req: NextRequest) {
         }
       }
 
-      await sendTelegram(chatId!, reply);
+      const tg = await sendTelegram(chatId!, reply);
+      return NextResponse.json({ ok: true, step: 'progress_updated', tg });
     }
 
-    return NextResponse.json({ ok: true });
+    return NextResponse.json({ ok: true, step: 'done' });
   } catch (err: any) {
     console.error('Bot POST error:', err);
+    let tg = null;
     if (chatId) {
-      await sendTelegram(chatId, `❌ Xatolik yuz berdi: <code>${(err?.message || 'Nomaʼlum xato').slice(0, 200)}</code>`);
+      tg = await sendTelegram(chatId, `❌ Xatolik yuz berdi: <code>${(err?.message || 'Nomaʼlum xato').slice(0, 200)}</code>`);
     }
-    return NextResponse.json({ ok: true });
+    return NextResponse.json({ ok: true, step: 'catch_error', error: err?.message, tg });
   }
 }
