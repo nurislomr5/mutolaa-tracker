@@ -11,6 +11,7 @@ const supabase = createClient(
 export default function ReadingDashboard() {
   const [books, setBooks] = useState<any[]>([]);
   const [notes, setNotes] = useState<any[]>([]);
+  const [dbError, setDbError] = useState<string | null>(null);
   const [tab, setTab] = useState<'active' | 'all' | 'notes'>('active');
 
   // PDF <-> Qog'oz Konvertor state
@@ -23,8 +24,13 @@ export default function ReadingDashboard() {
   }, []);
 
   async function fetchData() {
-    const { data: b } = await supabase.from('books').select('*').order('order_num');
+    const { data: b, error: bErr } = await supabase.from('books').select('*').order('order_num');
     const { data: n } = await supabase.from('book_notes').select('*, books(title)').order('created_at', { ascending: false });
+    if (bErr) {
+      setDbError(bErr.message || "Ma'lumotlar bazasiga ulanib bo'lmadi");
+    } else {
+      setDbError(null);
+    }
     if (b) setBooks(b);
     if (n) setNotes(n);
   }
@@ -65,6 +71,19 @@ export default function ReadingDashboard() {
           </div>
         </div>
       </div>
+
+      {dbError && (
+        <div className="mb-6 bg-red-950/60 border border-red-700/60 rounded-2xl p-4 text-sm text-red-200">
+          <div className="font-semibold text-red-300 mb-1">⚠️ Ma&apos;lumotlar bazasiga (Supabase) ulanib bo&lsquo;lmadi!</div>
+          <p className="text-xs text-red-300/90">
+            Bepul Supabase loyihasi 7 kunlik tanaffusdan so&lsquo;ng avtomatik &quot;Paused&quot; (uyqu) rejimiga o&lsquo;tgan.{' '}
+            <a href="https://supabase.com/dashboard" target="_blank" rel="noreferrer" className="underline font-semibold text-white">
+              Supabase Dashboard
+            </a>{' '}
+            ga kirib, loyihani <b>Restore / Unpause</b> qiling.
+          </p>
+        </div>
+      )}
 
       {/* NAVIGATSIYA TABLARI */}
       <div className="flex gap-2 mb-6">

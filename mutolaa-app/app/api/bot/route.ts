@@ -10,16 +10,18 @@ const supabase = createClient(
 const ai = new GoogleGenAI({ apiKey: process.env.GEMINI_API_KEY! });
 const BOT_TOKEN = process.env.TELEGRAM_BOT_TOKEN!;
 const ALLOWED_USER_ID = Number(process.env.MY_TELEGRAM_ID!);
+const APP_URL = process.env.NEXT_PUBLIC_APP_URL || 'https://mutolaa-tracker.vercel.app';
 
 // Progress-bar chizish funksiyasi
 function drawBar(current: number, total: number) {
+  if (!total || total <= 0) return `${'░'.repeat(10)} 0%`;
   const pct = Math.min(100, Math.round((current / total) * 100));
   const filled = Math.round(pct / 10);
   return `${'█'.repeat(filled)}${'░'.repeat(10 - filled)} ${pct}%`;
 }
 
 async function sendTelegram(chatId: number, text: string) {
-  await fetch(`https://api.telegram.org/bot${BOT_TOKEN}/sendMessage`, {
+  const res = await fetch(`https://api.telegram.org/bot${BOT_TOKEN}/sendMessage`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({
@@ -28,72 +30,94 @@ async function sendTelegram(chatId: number, text: string) {
       parse_mode: 'HTML',
       reply_markup: {
         inline_keyboard: [
-          [{ text: '📊 Web Dashboard / Mini App', web_app: { url: process.env.NEXT_PUBLIC_APP_URL! } }]
+          [{ text: '📊 Web Dashboard / Mini App', web_app: { url: APP_URL } }]
         ]
       }
     }),
   });
+  if (!res.ok) {
+    const errText = await res.text();
+    console.error('Telegram sendMessage error:', errText);
+  }
 }
 
 export async function POST(req: NextRequest) {
-  const update = await req.json();
-  const msg = update.message;
-  if (!msg || msg.from.id !== ALLOWED_USER_ID) return NextResponse.json({ ok: true });
-
-  const chatId = msg.chat.id;
-
-  // 1. Hozirgi aktiv kitoblarni olish
-  const { data: activeBooks } = await supabase
-    .from('books')
-    .select('*')
-    .eq('status', 'active')
-    .order('track');
-
-  // /status buyrug'i
-  if (msg.text === '/status' || msg.text === '/start') {
-    const lines = activeBooks?.map((b) => {
-      const icon = b.track === 'audio' ? '🎧' : b.track === 'cat_a' ? '📗' : b.track === 'cat_b' ? '🕌' : '🔄';
-      const unitLabel = b.unit === 'minutes' ? `${Math.floor(b.current_value / 60)}s ${b.current_value % 60}d / ${Math.floor(b.total_value / 60)}s ${b.total_value % 60}d` : `${b.current_value}/${b.total_value} bet`;
-      const modeTag = b.reading_mode === 'phone' ? ' 📱(PDF)' : '';
-      return `${icon} <b>${b.title}</b>${modeTag}\n<code>${drawBar(b.current_value, b.total_value)}</code> (${unitLabel})`;
-    });
-    await sendTelegram(chatId, `<b>📚 Hozirgi Aktiv Mutolaa:</b>\n\n${lines?.join('\n\n')}`);
-    return NextResponse.json({ ok: true });
-  }
-
-  // /savollar buyrug'i — Ustozdan so'raladigan barcha ochiq savollar
-  if (msg.text === '/savollar') {
-    const { data: qList } = await supabase
-      .from('book_notes')
-      .select('*, books(title)')
-      .eq('note_type', 'ustozga_savol')
-      .eq('is_resolved', false);
-
-    if (!qList?.length) {
-      await sendTelegram(chatId, '✅ Hozircha ustozdan so‘raladigan ochiq savollar yo‘q.');
+  let chatId: number | null = null;
+  try {
+    const update = await req.json();
+    const msg = update.message;
+    if (!msg || (ALLOWED_USER_ID && msg.from?.id !== ALLOWED_USER_ID)) {
       return NextResponse.json({ ok: true });
     }
-    const text = qList.map((q, i) => `${i + 1}. <b>${q.books.title}</b> (${q.reference_point || '-'}):\n<i>"${q.content}"</i>`).join('\n\n');
-    await sendTelegram(chatId, `<b>❓ Ustozdan so‘raladigan masalalar:</b>\n\n${text}`);
-    return NextResponse.json({ ok: true });
-  }
 
-  // 2. Matn yoki Ovozli xabarni Gemini orqali JSON ga aylantirish
-  let contents: any[] = [];
-  if (msg.voice) {
-    const fileRes = await fetch(`https://api.telegram.org/bot${BOT_TOKEN}/getFile?file_id=${msg.voice.file_id}`).then(r => r.json());
-    const audioBuffer = await fetch(`https://api.telegram.org/file/bot${BOT_TOKEN}/${fileRes.result.file_path}`).then(r => r.arrayBuffer());
-    contents.push({
-      inlineData: {
-        mimeType: 'audio/ogg',
-        data: Buffer.from(audioBuffer).toString('base64'),
-      },
-    });
-  } else if (msg.text) {
-    contents.push(msg.text);
-  }
+    chatId = msg.chat.id;
 
-  const systemPrompt = `
+    // 1. Hozirgi aktiv kitoblarni olish
+    const { data: activeBooks, error: dbError } = await supabase
+      .from('books')
+      .select('*')
+      .eq('status', 'active')
+      .order('track');
+
+    if (dbError) {
+      await sendTelegram(
+        chatId!,
+        `⚠️ <b>Ma'lumotlar bazasiga (Supabase) ulanib bo‘lmadi!</b>\n\nSababi: Supabase loyihangiz "Paused" (uyqu) rejimiga tushib qolgan.\n👉 <a href="https://supabase.com/dashboard">Supabase Dashboard</a> ga kirib loyihani <b>Restore / Unpause</b> qiling.`
+      );
+      return NextResponse.json({ ok: true });
+    }
+
+    // /status buyrug'i
+    if (msg.text === '/status' || msg.text === '/start') {
+      if (!activeBooks || activeBooks.length === 0) {
+        await sendTelegram(chatId!, '📚 Hozircha aktiv kitoblar topilmadi.');
+        return NextResponse.json({ ok: true });
+      }
+      const lines = activeBooks.map((b) => {
+        const icon = b.track === 'audio' ? '🎧' : b.track === 'cat_a' ? '📗' : b.track === 'cat_b' ? '🕌' : '🔄';
+        const unitLabel = b.unit === 'minutes' ? `${Math.floor(b.current_value / 60)}s ${b.current_value % 60}d / ${Math.floor(b.total_value / 60)}s ${b.total_value % 60}d` : `${b.current_value}/${b.total_value} bet`;
+        const modeTag = b.reading_mode === 'phone' ? ' 📱(PDF)' : '';
+        return `${icon} <b>${b.title}</b>${modeTag}\n<code>${drawBar(b.current_value, b.total_value)}</code> (${unitLabel})`;
+      });
+      await sendTelegram(chatId!, `<b>📚 Hozirgi Aktiv Mutolaa:</b>\n\n${lines.join('\n\n')}`);
+      return NextResponse.json({ ok: true });
+    }
+
+    // /savollar buyrug'i — Ustozdan so'raladigan barcha ochiq savollar
+    if (msg.text === '/savollar') {
+      const { data: qList } = await supabase
+        .from('book_notes')
+        .select('*, books(title)')
+        .eq('note_type', 'ustozga_savol')
+        .eq('is_resolved', false);
+
+      if (!qList?.length) {
+        await sendTelegram(chatId!, '✅ Hozircha ustozdan so‘raladigan ochiq savollar yo‘q.');
+        return NextResponse.json({ ok: true });
+      }
+      const text = qList.map((q, i) => `${i + 1}. <b>${q.books?.title || 'Kitob'}</b> (${q.reference_point || '-'}):\n<i>"${q.content}"</i>`).join('\n\n');
+      await sendTelegram(chatId!, `<b>❓ Ustozdan so‘raladigan masalalar:</b>\n\n${text}`);
+      return NextResponse.json({ ok: true });
+    }
+
+    // 2. Matn yoki Ovozli xabarni Gemini orqali JSON ga aylantirish
+    const contents: any[] = [];
+    if (msg.voice) {
+      const fileRes = await fetch(`https://api.telegram.org/bot${BOT_TOKEN}/getFile?file_id=${msg.voice.file_id}`).then(r => r.json());
+      const audioBuffer = await fetch(`https://api.telegram.org/file/bot${BOT_TOKEN}/${fileRes.result.file_path}`).then(r => r.arrayBuffer());
+      contents.push({
+        inlineData: {
+          mimeType: 'audio/ogg',
+          data: Buffer.from(audioBuffer).toString('base64'),
+        },
+      });
+    } else if (msg.text) {
+      contents.push(msg.text);
+    } else {
+      return NextResponse.json({ ok: true });
+    }
+
+    const systemPrompt = `
   Foydalanuvchining aktiv kitoblari: ${JSON.stringify(activeBooks?.map(b => ({ id: b.id, title: b.title, unit: b.unit, current: b.current_value, total: b.total_value })))}
   Xabarni tahlil qilib FAQAT JSON qaytar:
   {
@@ -107,79 +131,101 @@ export async function POST(req: NextRequest) {
     "note_content": string | null
   }`;
 
-  const aiRes = await ai.models.generateContent({
-    model: 'gemini-2.5-flash',
-    contents: [...contents, systemPrompt],
-    config: { responseMimeType: 'application/json' },
-  });
-
-  const parsed = JSON.parse(aiRes.text || '{}');
-  const targetBook = activeBooks?.find((b) => b.id === parsed.book_id);
-
-  if (!targetBook) {
-    await sendTelegram(chatId, '⚠️ Qaysi kitob ekanligini aniqlay olmadim. Kitob nomini aniqroq ayting.');
-    return NextResponse.json({ ok: true });
-  }
-
-  // 3A. QAYD YOKI USTOZGA SAVOL QO'SHISH
-  if (parsed.action === 'NOTE') {
-    await supabase.from('book_notes').insert({
-      book_id: targetBook.id,
-      note_type: parsed.note_type,
-      reference_point: parsed.reference_point,
-      content: parsed.note_content,
-    });
-    const badge = parsed.note_type === 'ustozga_savol' ? '❓ #ustozga_savol' : parsed.note_type === 'lugat' ? '📖 #lugat' : '💡 #xulosa';
-    await sendTelegram(chatId, `✅ <b>${targetBook.title}</b> bo‘yicha saqlandi (${badge}):\n\n📍 <b>Joyi:</b> ${parsed.reference_point || 'Ko‘rsatilmadi'}\n📝 <i>"${parsed.note_content}"</i>`);
-    return NextResponse.json({ ok: true });
-  }
-
-  // 3B. PROGRESS YANGILASH VA AVTOMATIK NAVBAT
-  if (parsed.action === 'PROGRESS' || parsed.action === 'MODE_SWITCH') {
-    const newTotal = parsed.new_total_value || targetBook.total_value;
-    const newVal = Math.min(newTotal, parsed.new_current_value ?? targetBook.current_value);
-    const delta = newVal - targetBook.current_value;
-    const isFinished = newVal >= newTotal;
-
-    await supabase
-      .from('books')
-      .update({
-        current_value: newVal,
-        total_value: newTotal,
-        reading_mode: parsed.reading_mode || targetBook.reading_mode,
-        status: isFinished ? 'completed' : 'active',
-        updated_at: new Date().toISOString(),
-      })
-      .eq('id', targetBook.id);
-
-    if (delta > 0) {
-      await supabase.from('reading_logs').insert({
-        book_id: targetBook.id,
-        delta_value: delta,
-        new_value: newVal,
-      });
-    }
-
-    let reply = `📈 <b>${targetBook.title}</b> yangilandi!\n<code>${drawBar(newVal, newTotal)}</code> (${newVal} / ${newTotal} ${targetBook.unit === 'minutes' ? 'daq' : 'bet'})`;
-
-    // Agar kitob 100% tugasa, navbatdagi kitobni avtomatik active qilish
-    if (isFinished) {
-      const { data: nextBooks } = await supabase
-        .from('books')
-        .select('*')
-        .eq('track', targetBook.track)
-        .eq('status', 'queued')
-        .order('order_num', { ascending: true })
-        .limit(1);
-
-      if (nextBooks && nextBooks.length > 0) {
-        await supabase.from('books').update({ status: 'active' }).eq('id', nextBooks[0].id);
-        reply += `\n\n🎉 <b>Muborak bo‘lsin, kitob yakunlandi!</b>\nShu yo‘nalish bo‘yicha navbatdagi kitob ochildi:\n👉 <b>${nextBooks[0].order_num}. ${nextBooks[0].title}</b>`;
+    let aiText = '';
+    const candidateModels = ['gemini-3.6-flash', 'gemini-3.5-flash', 'gemini-3-flash-preview'];
+    let lastAiErr: any = null;
+    for (const modelName of candidateModels) {
+      try {
+        const aiRes = await ai.models.generateContent({
+          model: modelName,
+          contents: [...contents, systemPrompt],
+          config: { responseMimeType: 'application/json' },
+        });
+        aiText = aiRes.text || '{}';
+        break;
+      } catch (err) {
+        lastAiErr = err;
       }
     }
 
-    await sendTelegram(chatId, reply);
-  }
+    if (!aiText) {
+      throw lastAiErr || new Error('AI javob qaytarmadi');
+    }
 
-  return NextResponse.json({ ok: true });
+    const parsed = JSON.parse(aiText);
+    const targetBook = activeBooks?.find((b) => b.id === parsed.book_id);
+
+    if (!targetBook) {
+      await sendTelegram(chatId!, '⚠️ Qaysi kitob ekanligini aniqlay olmadim. Kitob nomini aniqroq ayting.');
+      return NextResponse.json({ ok: true });
+    }
+
+    // 3A. QAYD YOKI USTOZGA SAVOL QO'SHISH
+    if (parsed.action === 'NOTE') {
+      await supabase.from('book_notes').insert({
+        book_id: targetBook.id,
+        note_type: parsed.note_type,
+        reference_point: parsed.reference_point,
+        content: parsed.note_content,
+      });
+      const badge = parsed.note_type === 'ustozga_savol' ? '❓ #ustozga_savol' : parsed.note_type === 'lugat' ? '📖 #lugat' : '💡 #xulosa';
+      await sendTelegram(chatId!, `✅ <b>${targetBook.title}</b> bo‘yicha saqlandi (${badge}):\n\n📍 <b>Joyi:</b> ${parsed.reference_point || 'Ko‘rsatilmadi'}\n📝 <i>"${parsed.note_content}"</i>`);
+      return NextResponse.json({ ok: true });
+    }
+
+    // 3B. PROGRESS YANGILASH VA AVTOMATIK NAVBAT
+    if (parsed.action === 'PROGRESS' || parsed.action === 'MODE_SWITCH') {
+      const newTotal = parsed.new_total_value || targetBook.total_value;
+      const newVal = Math.min(newTotal, parsed.new_current_value ?? targetBook.current_value);
+      const delta = newVal - targetBook.current_value;
+      const isFinished = newVal >= newTotal;
+
+      await supabase
+        .from('books')
+        .update({
+          current_value: newVal,
+          total_value: newTotal,
+          reading_mode: parsed.reading_mode || targetBook.reading_mode,
+          status: isFinished ? 'completed' : 'active',
+          updated_at: new Date().toISOString(),
+        })
+        .eq('id', targetBook.id);
+
+      if (delta > 0) {
+        await supabase.from('reading_logs').insert({
+          book_id: targetBook.id,
+          delta_value: delta,
+          new_value: newVal,
+        });
+      }
+
+      let reply = `📈 <b>${targetBook.title}</b> yangilandi!\n<code>${drawBar(newVal, newTotal)}</code> (${newVal} / ${newTotal} ${targetBook.unit === 'minutes' ? 'daq' : 'bet'})`;
+
+      // Agar kitob 100% tugasa, navbatdagi kitobni avtomatik active qilish
+      if (isFinished) {
+        const { data: nextBooks } = await supabase
+          .from('books')
+          .select('*')
+          .eq('track', targetBook.track)
+          .eq('status', 'queued')
+          .order('order_num', { ascending: true })
+          .limit(1);
+
+        if (nextBooks && nextBooks.length > 0) {
+          await supabase.from('books').update({ status: 'active' }).eq('id', nextBooks[0].id);
+          reply += `\n\n🎉 <b>Muborak bo‘lsin, kitob yakunlandi!</b>\nShu yo‘nalish bo‘yicha navbatdagi kitob ochildi:\n👉 <b>${nextBooks[0].order_num}. ${nextBooks[0].title}</b>`;
+        }
+      }
+
+      await sendTelegram(chatId!, reply);
+    }
+
+    return NextResponse.json({ ok: true });
+  } catch (err: any) {
+    console.error('Bot POST error:', err);
+    if (chatId) {
+      await sendTelegram(chatId, `❌ Xatolik yuz berdi: <code>${(err?.message || 'Nomaʼlum xato').slice(0, 200)}</code>`);
+    }
+    return NextResponse.json({ ok: true });
+  }
 }
