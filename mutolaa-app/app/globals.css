@@ -1,26 +1,85 @@
 @import "tailwindcss";
 
+/* Qorong'i rejim <html data-theme="dark"> orqali boshqariladi (layout.tsx dagi skript o'rnatadi) */
+@custom-variant dark (&:where([data-theme="dark"], [data-theme="dark"] *));
+
 :root {
-  --background: #ffffff;
-  --foreground: #171717;
+  color-scheme: light;
+  --bg: #faf7f2;
+  --surface: #ffffff;
+  --surface-2: #f3eee6;
+  --border: #e6dfd3;
+  --text: #1f1b16;
+  --muted: #6b6358;
+  --accent: #1f6f5c;
+  --accent-hover: #185a4a;
+  --accent-fg: #ffffff;
+  --accent-soft: #e2f0eb;
+  --warning: #a16207;
+  --warning-soft: #fdf3dc;
+  --danger: #b42318;
+  --danger-soft: #fde8e6;
 }
 
-@theme inline {
-  --color-background: var(--background);
-  --color-foreground: var(--foreground);
-  --font-sans: var(--font-geist-sans);
-  --font-mono: var(--font-geist-mono);
-}
-
+/* JS o'chiq bo'lsa ham tizim sozlamasiga amal qilamiz */
 @media (prefers-color-scheme: dark) {
-  :root {
-    --background: #0a0a0a;
-    --foreground: #ededed;
+  :root:not([data-theme="light"]) {
+    color-scheme: dark;
+    --bg: #14120f;
+    --surface: #1c1915;
+    --surface-2: #25211c;
+    --border: #342f28;
+    --text: #f3eee6;
+    --muted: #a59d90;
+    --accent: #5fb89a;
+    --accent-hover: #79c9ad;
+    --accent-fg: #0f1a15;
+    --accent-soft: #1d2e27;
+    --warning: #e0b04a;
+    --warning-soft: #2e2615;
+    --danger: #f07a6e;
+    --danger-soft: #331b18;
   }
 }
 
+:root[data-theme="dark"] {
+  color-scheme: dark;
+  --bg: #14120f;
+  --surface: #1c1915;
+  --surface-2: #25211c;
+  --border: #342f28;
+  --text: #f3eee6;
+  --muted: #a59d90;
+  --accent: #5fb89a;
+  --accent-hover: #79c9ad;
+  --accent-fg: #0f1a15;
+  --accent-soft: #1d2e27;
+  --warning: #e0b04a;
+  --warning-soft: #2e2615;
+  --danger: #f07a6e;
+  --danger-soft: #331b18;
+}
+
+@theme inline {
+  --color-bg: var(--bg);
+  --color-surface: var(--surface);
+  --color-surface-2: var(--surface-2);
+  --color-border: var(--border);
+  --color-text: var(--text);
+  --color-muted: var(--muted);
+  --color-accent: var(--accent);
+  --color-accent-hover: var(--accent-hover);
+  --color-accent-fg: var(--accent-fg);
+  --color-accent-soft: var(--accent-soft);
+  --color-warning: var(--warning);
+  --color-warning-soft: var(--warning-soft);
+  --color-danger: var(--danger);
+  --color-danger-soft: var(--danger-soft);
+  --font-sans: var(--font-inter);
+  --font-serif: var(--font-literata);
+}
+
 body {
-  background: var(--background);
-  color: var(--foreground);
-  font-family: Arial, Helvetica, sans-serif;
+  background: var(--bg);
+  color: var(--text);
 }

@@ -7,6 +7,16 @@ const nextConfig: NextConfig = {
   },
   cacheComponents: true,
   partialPrefetching: true,
+  images: {
+    // Mutolaa muqovalari o'z CDN'idan olinadi, biz ularni ko'chirmaymiz
+    remotePatterns: [
+      {
+        protocol: "https",
+        hostname: "cdn-minio.mutolaa.com",
+        pathname: "/media/**",
+      },
+    ],
+  },
   turbopack: {
     rules: {
       "*.css": {

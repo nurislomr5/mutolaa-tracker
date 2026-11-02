@@ -1,229 +1,113 @@
-'use client';
+import Link from "next/link";
+import { Container } from "@/components/ui/container";
+import { Card, CardTitle } from "@/components/ui/card";
+import { buttonClasses } from "@/components/ui/button";
+import { BookGrid } from "@/components/book/book-card";
+import { getPopularBooks, getTopics } from "@/lib/catalog";
+import { Suspense } from "react";
+import { BookCover } from "@/components/book/book-cover";
+import { Progress } from "@/components/ui/progress";
+import { uz } from "@/lib/i18n/uz";
+import { getShelfItems } from "@/lib/shelf";
+import { getSessionUser } from "@/lib/supabase/server";
 
-import { useEffect, useState } from 'react';
-import { createClient } from '@supabase/supabase-js';
-
-const supabase = createClient(
-  process.env.NEXT_PUBLIC_SUPABASE_URL!,
-  process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
-);
-
-export default function ReadingDashboard() {
-  const [books, setBooks] = useState<any[]>([]);
-  const [notes, setNotes] = useState<any[]>([]);
-  const [dbError, setDbError] = useState<string | null>(null);
-  const [tab, setTab] = useState<'active' | 'all' | 'notes'>('active');
-
-  // PDF <-> Qog'oz Konvertor state
-  const [pdfCurrent, setPdfCurrent] = useState('');
-  const [pdfTotal, setPdfTotal] = useState('');
-  const [paperTotal, setPaperTotal] = useState('');
-
-  useEffect(() => {
-    fetchData();
-  }, []);
-
-  async function fetchData() {
-    const { data: b, error: bErr } = await supabase.from('books').select('*').order('order_num');
-    const { data: n } = await supabase.from('book_notes').select('*, books(title)').order('created_at', { ascending: false });
-    if (bErr) {
-      setDbError(bErr.message || "Ma'lumotlar bazasiga ulanib bo'lmadi");
-    } else {
-      setDbError(null);
-    }
-    if (b) setBooks(b);
-    if (n) setNotes(n);
-  }
-
-  const activeBooks = books.filter((b) => b.status === 'active');
-  const completedCount = books.filter((b) => b.status === 'completed').length;
-
-  const trackLabels: Record<string, { title: string; badge: string }> = {
-    audio: { title: '🎧 1-oqim: Yo‘l va Transport (Audio)', badge: 'bg-amber-500/20 text-amber-300' },
-    cat_a: { title: '📗 2A-oqim: Adabiyot, Tarix va Tafakkur', badge: 'bg-emerald-500/20 text-emerald-300' },
-    cat_b: { title: '🕌 2B-oqim: Islomiy Ilm (Asosiy navbat)', badge: 'bg-sky-500/20 text-sky-300' },
-    daily_vird: { title: '🔄 3-oqim: Doimiy Ilmiy Mutolaa (Vird)', badge: 'bg-purple-500/20 text-purple-300' },
-  };
-
-  const convertedPaperPage =
-    pdfCurrent && pdfTotal && paperTotal
-      ? Math.round((Number(pdfCurrent) / Number(pdfTotal)) * Number(paperTotal))
-      : null;
-
+// Kirgan foydalanuvchi uchun: hozir oʻqilayotgan kitoblar (mehmonga hech narsa koʻrinmaydi)
+async function NowReading() {
+  if (!(await getSessionUser())) return null;
+  const items = await getShelfItems({ status: "reading" });
+  if (!items.length) return null;
   return (
-    <div className="min-h-screen bg-slate-950 text-slate-100 p-4 md:p-8 max-w-5xl mx-auto">
-      {/* HEADER VA UMUMIY STATISTIKA */}
-      <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4 mb-8 border-b border-slate-800 pb-6">
-        <div>
-          <h1 className="text-2xl font-bold tracking-tight">Mutolaa OS — 50 Kitob Tizimi</h1>
-          <p className="text-sm text-slate-400">8 Audio • 23 Adabiyot & Tafakkur • 19 Islomiy ilm (61 jild)</p>
-        </div>
-        <div className="flex gap-3">
-          <div className="bg-slate-900 border border-slate-800 rounded-xl px-4 py-2 text-center">
-            <div className="text-xs text-slate-400">Yakunlandi</div>
-            <div className="text-lg font-bold text-emerald-400">{completedCount} / {books.length}</div>
-          </div>
-          <div className="bg-slate-900 border border-slate-800 rounded-xl px-4 py-2 text-center">
-            <div className="text-xs text-slate-400">Ustozga savollar</div>
-            <div className="text-lg font-bold text-amber-400">
-              {notes.filter((n) => n.note_type === 'ustozga_savol' && !n.is_resolved).length} ta
-            </div>
-          </div>
-        </div>
+    <Container className="pt-10">
+      <div className="mb-4 flex items-baseline justify-between">
+        <h2 className="font-serif text-2xl font-semibold">{uz.shelf.nowReading}</h2>
+        <Link href="/javonim" className="text-sm text-accent hover:underline">
+          {uz.shelf.seeShelf}
+        </Link>
       </div>
-
-      {dbError && (
-        <div className="mb-6 bg-red-950/60 border border-red-700/60 rounded-2xl p-4 text-sm text-red-200">
-          <div className="font-semibold text-red-300 mb-1">⚠️ Ma&apos;lumotlar bazasiga (Supabase) ulanib bo&lsquo;lmadi!</div>
-          <p className="text-xs text-red-300/90">
-            Bepul Supabase loyihasi 7 kunlik tanaffusdan so&lsquo;ng avtomatik &quot;Paused&quot; (uyqu) rejimiga o&lsquo;tgan.{' '}
-            <a href="https://supabase.com/dashboard" target="_blank" rel="noreferrer" className="underline font-semibold text-white">
-              Supabase Dashboard
-            </a>{' '}
-            ga kirib, loyihani <b>Restore / Unpause</b> qiling.
-          </p>
-        </div>
-      )}
-
-      {/* NAVIGATSIYA TABLARI */}
-      <div className="flex gap-2 mb-6">
-        {[
-          { id: 'active', label: '🔥 Hozirgi Fokus (4 Oqim)' },
-          { id: 'notes', label: '❓ Savollar, Lug‘at & Xulosalar' },
-          { id: 'all', label: '📚 To‘liq Ro‘yxat (61 jild)' },
-        ].map((t) => (
-          <button
-            key={t.id}
-            onClick={() => setTab(t.id as any)}
-            className={`px-4 py-2 rounded-lg text-sm font-medium transition ${
-              tab === t.id ? 'bg-indigo-600 text-white' : 'bg-slate-900 text-slate-400 hover:bg-slate-800'
-            }`}
-          >
-            {t.label}
-          </button>
+      <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
+        {items.slice(0, 6).map((it) => (
+          <Link key={it.id} href={`/kitob/${it.book.slug}`} className="flex gap-3 rounded-2xl border border-border bg-surface p-3 hover:bg-surface-2">
+            <BookCover src={it.book.cover_url} title={it.book.title} sizes="56px" className="w-14 shrink-0" />
+            <div className="min-w-0 flex-1">
+              <p className="line-clamp-2 text-sm font-semibold">{it.book.title}</p>
+              <p className="line-clamp-1 text-xs text-muted">{it.book.author_names}</p>
+              {it.total_value ? (
+                <Progress value={it.current_value} max={it.total_value} className="mt-2" label={`${it.current_value} / ${it.total_value} ${uz.shelf.unit[it.unit]}`} />
+              ) : null}
+            </div>
+          </Link>
         ))}
       </div>
+    </Container>
+  );
+}
 
-      {/* 1-TAB: AKTIV FOKUS DOSKASI + FORMAT KONVERTORI */}
-      {tab === 'active' && (
-        <div className="space-y-6">
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-            {activeBooks.map((book) => {
-              const pct = Math.min(100, Math.round((book.current_value / book.total_value) * 100));
-              const meta = trackLabels[book.track];
-              return (
-                <div key={book.id} className="bg-slate-900 border border-slate-800 rounded-2xl p-5 flex flex-col justify-between">
-                  <div>
-                    <div className="flex justify-between items-center mb-3">
-                      <span className={`text-xs px-2.5 py-1 rounded-full font-medium ${meta.badge}`}>
-                        {meta.title}
-                      </span>
-                      <span className="text-xs text-slate-400 uppercase">{book.reading_mode}</span>
-                    </div>
-                    <h3 className="text-lg font-semibold text-white">{book.order_num}. {book.title}</h3>
-                    <p className="text-xs text-slate-400 mb-4">{book.author}</p>
-                  </div>
+async function Popular() {
+  const [books, topics] = await Promise.all([getPopularBooks(12), getTopics()]);
+  return (
+    <Container className="py-14">
+      <div className="mb-5 flex items-baseline justify-between">
+        <h2 className="font-serif text-2xl font-semibold">{uz.popular.title}</h2>
+        <Link href="/kitoblar" className="text-sm text-accent hover:underline">
+          {uz.popular.seeAll}
+        </Link>
+      </div>
+      <BookGrid books={books} />
 
-                  <div>
-                    <div className="flex justify-between text-xs mb-1.5">
-                      <span className="text-slate-300 font-medium">
-                        {book.unit === 'minutes'
-                          ? `${Math.floor(book.current_value / 60)}s ${book.current_value % 60}d / ${Math.floor(book.total_value / 60)}s ${book.total_value % 60}d`
-                          : `${book.current_value} / ${book.total_value} bet`}
-                      </span>
-                      <span className="text-indigo-400 font-bold">{pct}%</span>
-                    </div>
-                    <div className="w-full bg-slate-800 h-2.5 rounded-full overflow-hidden">
-                      <div className="bg-indigo-500 h-full rounded-full transition-all" style={{ width: `${pct}%` }} />
-                    </div>
-                  </div>
-                </div>
-              );
-            })}
+      <h2 className="mb-4 mt-14 font-serif text-2xl font-semibold">{uz.popular.topicsTitle}</h2>
+      <div className="flex flex-wrap gap-2">
+        {topics.map((tp) => (
+          <Link
+            key={tp.slug}
+            href={`/kitoblar?rukn=${tp.slug}`}
+            className="rounded-full border border-border bg-surface px-3 py-1 text-sm text-muted transition-colors hover:text-text"
+          >
+            {tp.name} <span className="text-xs opacity-70">{tp.count}</span>
+          </Link>
+        ))}
+      </div>
+    </Container>
+  );
+}
+
+export default function HomePage() {
+  const t = uz.home;
+  return (
+    <>
+      <section className="border-b border-border bg-surface-2/50">
+        <Container className="py-16 sm:py-24">
+          <p className="mb-3 text-sm font-medium text-accent">{t.eyebrow}</p>
+          <h1 className="max-w-3xl font-serif text-4xl font-semibold leading-tight sm:text-5xl">{t.title}</h1>
+          <p className="mt-5 max-w-2xl text-lg text-muted">{t.subtitle}</p>
+          <div className="mt-8 flex flex-wrap gap-3">
+            <Link href="/kitoblar" className={buttonClasses({ size: "lg" })}>
+              {t.ctaCatalog}
+            </Link>
+            <Link href="/kirish" className={buttonClasses({ size: "lg", variant: "secondary" })}>
+              {t.ctaSignIn}
+            </Link>
           </div>
+          <p className="mt-6 text-sm text-muted">{t.searchHint}</p>
+        </Container>
+      </section>
 
-          {/* QOG'OZ <-> TELEFON (PDF) KONVERTORI */}
-          <div className="bg-slate-900/70 border border-slate-800 rounded-2xl p-5">
-            <h4 className="text-sm font-semibold text-slate-200 mb-1">📱 ↔ 📖 Vaqtinchalik Telefon (PDF) / Qog‘oz Bet Konvertori</h4>
-            <p className="text-xs text-slate-400 mb-4">
-              Qog‘oz kitob topilmay vaqtincha telefonda o‘qiganingizda, PDF betini qog‘oz nashr betiga (yoki aksincha) proporsional o‘girish:
-            </p>
-            <div className="grid grid-cols-1 sm:grid-cols-4 gap-3 items-center">
-              <input
-                type="number"
-                placeholder="PDFdagi joriy bet (masalan: 140)"
-                value={pdfCurrent}
-                onChange={(e) => setPdfCurrent(e.target.value)}
-                className="bg-slate-950 border border-slate-800 rounded-lg px-3 py-2 text-sm"
-              />
-              <input
-                type="number"
-                placeholder="PDF jami beti (masalan: 480)"
-                value={pdfTotal}
-                onChange={(e) => setPdfTotal(e.target.value)}
-                className="bg-slate-950 border border-slate-800 rounded-lg px-3 py-2 text-sm"
-              />
-              <input
-                type="number"
-                placeholder="Qog‘oz kitob jami beti (320)"
-                value={paperTotal}
-                onChange={(e) => setPaperTotal(e.target.value)}
-                className="bg-slate-950 border border-slate-800 rounded-lg px-3 py-2 text-sm"
-              />
-              <div className="bg-indigo-950/60 border border-indigo-700/50 rounded-lg px-3 py-2 text-sm text-center font-semibold text-indigo-300">
-                {convertedPaperPage !== null ? `Qog‘ozda: ${convertedPaperPage}-bet` : 'Natija shu yerda chiqadi'}
-              </div>
-            </div>
-          </div>
-        </div>
-      )}
+      <Suspense fallback={null}>
+        <NowReading />
+      </Suspense>
 
-      {/* 2-TAB: SAVOLLAR, LUG'AT VA XULOSALAR */}
-      {tab === 'notes' && (
-        <div className="space-y-3">
-          {notes.map((n) => (
-            <div key={n.id} className="bg-slate-900 border border-slate-800 rounded-xl p-4 flex justify-between items-start gap-4">
-              <div>
-                <div className="flex items-center gap-2 mb-1">
-                  <span className="text-xs font-semibold px-2 py-0.5 rounded bg-slate-800 text-indigo-300">
-                    #{n.note_type}
-                  </span>
-                  <span className="text-sm font-medium text-white">{n.books?.title}</span>
-                  {n.reference_point && <span className="text-xs text-slate-400">({n.reference_point})</span>}
-                </div>
-                <p className="text-sm text-slate-300">{n.content}</p>
-              </div>
-            </div>
+      <Popular />
+
+      <Container className="border-t border-border py-14">
+        <h2 className="mb-6 font-serif text-2xl font-semibold">{t.featuresTitle}</h2>
+        <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
+          {t.features.map((f) => (
+            <Card key={f.title}>
+              <CardTitle>{f.title}</CardTitle>
+              <p className="mt-2 text-sm text-muted">{f.body}</p>
+            </Card>
           ))}
         </div>
-      )}
-
-      {/* 3-TAB: TO'LIQ RO'YXAT */}
-      {tab === 'all' && (
-        <div className="space-y-2">
-          {books.map((b) => {
-            const pct = Math.min(100, Math.round((b.current_value / b.total_value) * 100));
-            return (
-              <div key={b.id} className="bg-slate-900 border border-slate-800/80 rounded-xl px-4 py-3 flex items-center justify-between">
-                <div>
-                  <span className="text-xs text-slate-500 mr-2">[{b.track.toUpperCase()}]</span>
-                  <span className="text-sm font-medium text-slate-200">{b.order_num}. {b.title}</span>
-                  <span className="text-xs text-slate-500 ml-2">— {b.author}</span>
-                </div>
-                <div className="flex items-center gap-3">
-                  <span className="text-xs text-slate-400">{pct}%</span>
-                  <span className={`text-xs px-2 py-0.5 rounded ${
-                    b.status === 'completed' ? 'bg-emerald-500/20 text-emerald-300' :
-                    b.status === 'active' ? 'bg-indigo-500/20 text-indigo-300' : 'bg-slate-800 text-slate-500'
-                  }`}>
-                    {b.status}
-                  </span>
-                </div>
-              </div>
-            );
-          })}
-        </div>
-      )}
-    </div>
+      </Container>
+    </>
   );
 }

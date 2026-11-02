@@ -1,0 +1,14 @@
+{
+  "version": "0.0.1",
+  "configurations": [
+    {
+      "name": "mutolaa-app",
+      "runtimeExecutable": "node",
+      "runtimeArgs": [
+        "-e",
+        "for (const k of ['NEXT_PUBLIC_SUPABASE_URL','NEXT_PUBLIC_SUPABASE_ANON_KEY','SUPABASE_SERVICE_ROLE_KEY','SUPABASE_PROJECT_REF']) delete process.env[k]; require('child_process').spawn('npm', ['run', 'dev'], { cwd: 'mutolaa-app', stdio: 'inherit', shell: true }).on('exit', (c) => process.exit(c ?? 0))"
+      ],
+      "port": 3000
+    }
+  ]
+}

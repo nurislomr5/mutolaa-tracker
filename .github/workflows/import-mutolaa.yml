@@ -1,0 +1,35 @@
+# Mutolaa katalogini har hafta yangilaydi (yangi kitoblar + 7 kundan eski yozuvlar).
+# Repo Settings → Secrets and variables → Actions ga qo'shing:
+#   NEXT_PUBLIC_SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY
+name: Mutolaa katalog importi
+
+on:
+  schedule:
+    - cron: "0 2 * * 1" # har dushanba 02:00 UTC (07:00 Toshkent)
+  workflow_dispatch:
+    inputs:
+      args:
+        description: "Qo'shimcha argumentlar (masalan: --force yoki --limit 50)"
+        required: false
+        default: ""
+
+jobs:
+  import:
+    runs-on: ubuntu-latest
+    timeout-minutes: 120
+    defaults:
+      run:
+        working-directory: mutolaa-app
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: npm
+          cache-dependency-path: mutolaa-app/package-lock.json
+      - run: npm ci
+      - run: npm run import:mutolaa -- $IMPORT_ARGS
+        env:
+          IMPORT_ARGS: ${{ inputs.args }}
+          NEXT_PUBLIC_SUPABASE_URL: ${{ secrets.NEXT_PUBLIC_SUPABASE_URL }}
+          SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
