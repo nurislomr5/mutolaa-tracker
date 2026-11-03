@@ -10,6 +10,7 @@
  *   npm run import:asaxiy -- --force              # hammasini qayta yuklash (narx/mavjudlikni yangilash)
  */
 import type { SupabaseClient } from "@supabase/supabase-js";
+import { PUBLISHER_NAMES, publisherSlug } from "../lib/publishers";
 import { slugify, uzNormalize } from "../lib/text/normalize";
 import { cliArgs, createAdmin, decodeHtml, fetchText, jsonLdNodes, loadEnv, runPool } from "./lib/common";
 
@@ -206,13 +207,18 @@ class Saver {
     for (const p of data ?? []) this.publishers.set(p.slug, p.id);
   }
 
+  // Taxalluslar (lib/publishers.ts) asosiy nashriyotga bogʻlanadi: "\"Sharq\" NMAK" -> Sharq
   private async publisherId(name: string | null) {
     if (!name) return null;
-    const slug = slugify(name);
+    const slug = publisherSlug(name);
     if (!slug) return null;
     const cached = this.publishers.get(slug);
     if (cached) return cached;
-    const { data, error } = await this.db.from("publishers").upsert({ name, slug }, { onConflict: "slug" }).select("id").single();
+    const { data, error } = await this.db
+      .from("publishers")
+      .upsert({ name: PUBLISHER_NAMES[slug] ?? name, slug }, { onConflict: "slug" })
+      .select("id")
+      .single();
     if (error) throw new Error(`publishers: ${error.message}`);
     this.publishers.set(slug, data.id);
     return data.id as number;

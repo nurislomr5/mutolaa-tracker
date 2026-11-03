@@ -1,5 +1,6 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
 import type { BookInput } from "@/lib/book-input";
+import { publisherSlug } from "@/lib/publishers";
 import { slugify } from "@/lib/text/normalize";
 
 // Foydalanuvchi kitobini katalogga yozish (service role klient bilan, faqat server action'lardan)
@@ -7,7 +8,7 @@ import { slugify } from "@/lib/text/normalize";
 // Nashriyot katalogda boʻlsa — bogʻlaymiz, aks holda matn sifatida saqlaymiz (yangi nashriyot yaratmaymiz)
 export async function resolvePublisher(admin: SupabaseClient, name: string | undefined) {
   if (!name) return { publisher_id: null, publisher: null };
-  const { data } = await admin.from("publishers").select("id").eq("slug", slugify(name)).maybeSingle();
+  const { data } = await admin.from("publishers").select("id").eq("slug", publisherSlug(name)).maybeSingle();
   return data ? { publisher_id: data.id as number, publisher: null } : { publisher_id: null, publisher: name };
 }
 

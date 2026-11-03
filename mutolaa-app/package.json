@@ -9,7 +9,8 @@
     "lint": "eslint",
     "import:mutolaa": "tsx scripts/import-mutolaa.ts",
     "bot:setup": "tsx scripts/telegram-webhook.ts",
-    "import:asaxiy": "tsx scripts/import-asaxiy.ts"
+    "import:asaxiy": "tsx scripts/import-asaxiy.ts",
+    "publishers:merge": "tsx scripts/merge-publishers.ts"
   },
   "dependencies": {
     "@google/genai": "^2.31.0",
