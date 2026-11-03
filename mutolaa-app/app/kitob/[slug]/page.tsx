@@ -11,6 +11,7 @@ import { Container } from "@/components/ui/container";
 import { getAuthor, getBook, getPopularBooks, type BookDetail } from "@/lib/catalog";
 import { formatCount, formatDuration, formatRating } from "@/lib/format";
 import { uz } from "@/lib/i18n/uz";
+import { ReadersSection } from "./readers";
 import { MyBookSection, ShelfActions } from "./shelf-panel";
 
 // Eng mashhur kitoblar build paytida tayyorlanadi, qolganlari birinchi tashrifda keshlanadi
@@ -173,6 +174,10 @@ async function BookView({ params }: { params: PageProps<"/kitob/[slug]">["params
 
       <Suspense fallback={null}>
         <MyBookSection book={book} />
+      </Suspense>
+
+      <Suspense fallback={null}>
+        <ReadersSection bookId={book.id} />
       </Suspense>
 
       <Suspense fallback={null}>

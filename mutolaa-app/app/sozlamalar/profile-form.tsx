@@ -1,5 +1,6 @@
 "use client";
 
+import Link from "next/link";
 import { useActionState } from "react";
 import { updateProfile } from "@/app/actions/profile";
 import { Button } from "@/components/ui/button";
@@ -24,6 +25,18 @@ export function ProfileForm({ profile }: { profile: Profile }) {
       <label className="block text-sm font-medium">
         {t.yearlyGoal}
         <Input name="yearly_goal" type="number" min={1} max={1000} defaultValue={profile.yearly_goal ?? ""} className="mt-1 max-w-32" />
+      </label>
+      <label className="flex items-start gap-3 rounded-lg border border-border p-3 text-sm">
+        <input type="checkbox" name="is_public" defaultChecked={profile.is_public} className="mt-0.5 h-4 w-4 accent-[var(--accent)]" />
+        <span>
+          <span className="font-medium">{t.isPublic}</span>
+          <span className="mt-0.5 block text-xs text-muted">{t.isPublicHint}</span>
+          {profile.is_public && profile.username && (
+            <Link href={`/u/${profile.username}`} className="mt-1 inline-block text-xs text-accent hover:underline">
+              {t.viewProfile} →
+            </Link>
+          )}
+        </span>
       </label>
       <div className="flex items-center gap-3">
         <Button type="submit" disabled={pending}>

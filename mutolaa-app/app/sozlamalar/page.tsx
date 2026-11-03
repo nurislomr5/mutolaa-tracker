@@ -6,7 +6,7 @@ import { Button } from "@/components/ui/button";
 import { Card, CardTitle } from "@/components/ui/card";
 import { Container } from "@/components/ui/container";
 import { uz } from "@/lib/i18n/uz";
-import { getProfile } from "@/lib/shelf";
+import { getProfile, isTelegramLinked } from "@/lib/shelf";
 import { getSessionUser } from "@/lib/supabase/server";
 import { ProfileForm } from "./profile-form";
 import { TelegramLink } from "./telegram-link";
@@ -16,7 +16,7 @@ export const metadata: Metadata = { title: uz.settings.title };
 async function Settings() {
   const user = await getSessionUser();
   if (!user) redirect("/kirish?next=/sozlamalar");
-  const profile = await getProfile();
+  const [profile, telegramLinked] = await Promise.all([getProfile(), isTelegramLinked()]);
   const t = uz.settings;
 
   return (
@@ -30,7 +30,7 @@ async function Settings() {
         <Card>
           <CardTitle>{t.telegram}</CardTitle>
           <p className="mb-4 mt-2 text-sm text-muted">{t.telegramIntro}</p>
-          <TelegramLink linked={Boolean(profile?.telegram_id)} />
+          <TelegramLink linked={telegramLinked} />
         </Card>
         <Card>
           <CardTitle>{uz.auth.account}</CardTitle>

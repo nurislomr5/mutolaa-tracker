@@ -19,6 +19,11 @@
   --warning-soft: #fdf3dc;
   --danger: #b42318;
   --danger-soft: #fde8e6;
+  /* faollik xaritasi: bitta tusli shkala (validate_palette --ordinal, fon #ffffff) */
+  --heat-1: #7cbfa5;
+  --heat-2: #4fa284;
+  --heat-3: #2f8269;
+  --heat-4: #1a5a4b;
 }
 
 /* JS o'chiq bo'lsa ham tizim sozlamasiga amal qilamiz */
@@ -39,6 +44,10 @@
     --warning-soft: #2e2615;
     --danger: #f07a6e;
     --danger-soft: #331b18;
+    --heat-1: #2a5a4a;
+    --heat-2: #3d826a;
+    --heat-3: #5fb89a;
+    --heat-4: #94dcc0;
   }
 }
 
@@ -58,6 +67,10 @@
   --warning-soft: #2e2615;
   --danger: #f07a6e;
   --danger-soft: #331b18;
+  --heat-1: #2a5a4a;
+  --heat-2: #3d826a;
+  --heat-3: #5fb89a;
+  --heat-4: #94dcc0;
 }
 
 @theme inline {
@@ -75,6 +88,10 @@
   --color-warning-soft: var(--warning-soft);
   --color-danger: var(--danger);
   --color-danger-soft: var(--danger-soft);
+  --color-heat-1: var(--heat-1);
+  --color-heat-2: var(--heat-2);
+  --color-heat-3: var(--heat-3);
+  --color-heat-4: var(--heat-4);
   --font-sans: var(--font-inter);
   --font-serif: var(--font-literata);
 }

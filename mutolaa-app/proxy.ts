@@ -2,7 +2,7 @@ import { createServerClient } from "@supabase/ssr";
 import { NextResponse, type NextRequest } from "next/server";
 
 // Faqat kirgan foydalanuvchilar uchun sahifalar
-const PROTECTED = ["/javonim", "/qaydlar", "/statistika", "/sozlamalar"];
+const PROTECTED = ["/javonim", "/lenta", "/qaydlar", "/statistika", "/sozlamalar"];
 
 // Har bir soʻrovda Supabase sessiyasini yangilaydi va himoyalangan sahifalarga mehmonni /kirish ga yuboradi.
 // Bu faqat optimistik tekshiruv — haqiqiy ruxsat RLS va server action'lardagi getSessionUser() da.

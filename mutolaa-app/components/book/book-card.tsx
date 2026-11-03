@@ -4,8 +4,11 @@ import { FormatIcon } from "@/components/book/format-icons";
 import type { BookCardData } from "@/lib/catalog";
 import { formatRating } from "@/lib/format";
 
-export function BookCard({ book, priority }: { book: BookCardData; priority?: boolean }) {
-  const rating = formatRating(book.mutolaa_rating);
+// userRating berilsa — Mutolaa reytingi oʻrniga kitobxonning oʻz bahosi koʻrsatiladi (ommaviy profilda)
+type CardBook = BookCardData & { userRating?: number | null };
+
+export function BookCard({ book, priority }: { book: CardBook; priority?: boolean }) {
+  const rating = formatRating(book.userRating !== undefined ? book.userRating : book.mutolaa_rating);
   return (
     <Link href={`/kitob/${book.slug}`} className="group flex flex-col gap-2">
       <BookCover src={book.cover_url} title={book.title} priority={priority} className="transition-transform group-hover:-translate-y-0.5" />
@@ -23,7 +26,7 @@ export function BookCard({ book, priority }: { book: BookCardData; priority?: bo
   );
 }
 
-export function BookGrid({ books, priorityCount = 0 }: { books: BookCardData[]; priorityCount?: number }) {
+export function BookGrid({ books, priorityCount = 0 }: { books: CardBook[]; priorityCount?: number }) {
   return (
     <div className="grid grid-cols-2 gap-x-4 gap-y-6 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-6">
       {books.map((b, i) => (

@@ -1,6 +1,7 @@
 import { createServerClient } from "@supabase/ssr";
 import { cookies } from "next/headers";
 import { connection } from "next/server";
+import { cache } from "react";
 
 // Har bir soʻrov uchun yangi klient (foydalanuvchi sessiyasi cookie'da). Faqat server komponent / action / route'da.
 export async function createServerSupabase() {
@@ -23,11 +24,11 @@ export async function createServerSupabase() {
 
 export type SessionUser = { id: string; email: string | null };
 
-// JWT imzosini tekshiradi (getSession'dan farqli oʻlaroq ishonchli)
-export async function getSessionUser(): Promise<SessionUser | null> {
+// JWT imzosini tekshiradi (getSession'dan farqli oʻlaroq ishonchli). Bitta soʻrov ichida bir marta bajariladi.
+export const getSessionUser = cache(async (): Promise<SessionUser | null> => {
   const supabase = await createServerSupabase();
   const { data } = await supabase.auth.getClaims();
   const claims = data?.claims;
   if (!claims?.sub) return null;
   return { id: claims.sub, email: (claims.email as string | undefined) ?? null };
-}
+});

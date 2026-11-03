@@ -1,11 +1,12 @@
 import { cache } from "react";
 import type { BookCardData } from "@/lib/catalog";
 import type { Note, NoteType, Shelf, ShelfStatus, UserBook } from "@/lib/shelf-types";
-import { createServerSupabase } from "@/lib/supabase/server";
+import { createServerSupabase, getSessionUser } from "@/lib/supabase/server";
 
 export * from "@/lib/shelf-types";
 
-// Foydalanuvchiga xos maʼlumot — keshlanmaydi, RLS faqat oʻz qatorlarini qaytaradi.
+// Foydalanuvchiga xos maʼlumot — keshlanmaydi. Ochiq profillar javoni boshqalarga ham oʻqiladi (RLS),
+// shuning uchun user_books/profiles soʻrovlari har doim joriy foydalanuvchi bilan aniq cheklanadi.
 
 const USER_BOOK_COLUMNS =
   "id, book_id, status, format, unit, current_value, total_value, started_at, finished_at, rating, review, updated_at";
@@ -14,9 +15,11 @@ const BOOK_CARD = "id, slug, title, author_names, cover_url, formats, mutolaa_ra
 
 // Kitob sahifasida ikki joyda ishlatiladi — bitta soʻrov ichida bir marta bajariladi
 export const getBookShelfState = cache(async (bookId: number) => {
+  const user = await getSessionUser();
+  if (!user) return { userBook: null, notes: [] as Note[], shelves: [], shelfIds: new Set<number>() };
   const supabase = await createServerSupabase();
   const [{ data: userBook }, { data: shelves }, { data: inShelves }] = await Promise.all([
-    supabase.from("user_books").select(USER_BOOK_COLUMNS).eq("book_id", bookId).maybeSingle(),
+    supabase.from("user_books").select(USER_BOOK_COLUMNS).eq("user_id", user.id).eq("book_id", bookId).maybeSingle(),
     supabase.from("shelves").select("id, name").order("created_at"),
     supabase.from("shelf_books").select("shelf_id").eq("book_id", bookId),
   ]);
@@ -40,10 +43,13 @@ export const getBookShelfState = cache(async (bookId: number) => {
 export type ShelfItem = UserBook & { book: BookCardData };
 
 export async function getShelfItems({ status, shelfId }: { status?: ShelfStatus; shelfId?: number }) {
+  const user = await getSessionUser();
+  if (!user) return [];
   const supabase = await createServerSupabase();
   let query = supabase
     .from("user_books")
     .select(`${USER_BOOK_COLUMNS}, books!inner(${BOOK_CARD}${shelfId ? ", shelf_books!inner(shelf_id)" : ""})`)
+    .eq("user_id", user.id)
     .order("updated_at", { ascending: false });
   if (status) query = query.eq("status", status);
   if (shelfId) query = query.eq("books.shelf_books.shelf_id", shelfId);
@@ -53,10 +59,12 @@ export async function getShelfItems({ status, shelfId }: { status?: ShelfStatus;
 }
 
 export async function getStatusCounts() {
-  const supabase = await createServerSupabase();
-  const { data, error } = await supabase.from("user_books").select("status");
-  if (error) throw new Error(`Javon: ${error.message}`);
   const counts: Record<ShelfStatus, number> = { reading: 0, want: 0, read: 0, dnf: 0 };
+  const user = await getSessionUser();
+  if (!user) return counts;
+  const supabase = await createServerSupabase();
+  const { data, error } = await supabase.from("user_books").select("status").eq("user_id", user.id);
+  if (error) throw new Error(`Javon: ${error.message}`);
   for (const r of data ?? []) counts[r.status as ShelfStatus]++;
   return counts;
 }
@@ -95,14 +103,25 @@ export type Profile = {
   display_name: string | null;
   avatar_url: string | null;
   yearly_goal: number | null;
-  telegram_id: number | null;
+  is_public: boolean;
 };
 
 export async function getProfile(): Promise<Profile | null> {
+  const user = await getSessionUser();
+  if (!user) return null;
   const supabase = await createServerSupabase();
   const { data } = await supabase
     .from("profiles")
-    .select("id, username, display_name, avatar_url, yearly_goal, telegram_id")
+    .select("id, username, display_name, avatar_url, yearly_goal, is_public")
+    .eq("id", user.id)
     .maybeSingle();
   return (data as Profile | null) ?? null;
+}
+
+export async function isTelegramLinked() {
+  const user = await getSessionUser();
+  if (!user) return false;
+  const supabase = await createServerSupabase();
+  const { data } = await supabase.from("telegram_accounts").select("user_id").eq("user_id", user.id).maybeSingle();
+  return Boolean(data);
 }

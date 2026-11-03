@@ -26,6 +26,6 @@ export async function unlinkTelegram() {
   const user = await getSessionUser();
   if (!user) return;
   const supabase = await createServerSupabase();
-  await supabase.from("profiles").update({ telegram_id: null }).eq("id", user.id);
+  await supabase.from("telegram_accounts").delete().eq("user_id", user.id);
   refresh();
 }

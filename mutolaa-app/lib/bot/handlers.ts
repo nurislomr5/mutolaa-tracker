@@ -4,6 +4,7 @@ import { answerCallback, appUrl, downloadFile, drawBar, esc, sendMessage, type I
 import { formatDuration } from "@/lib/format";
 import { uz } from "@/lib/i18n/uz";
 import { applyProgress, setStatusFor } from "@/lib/shelf-ops";
+import { addDays, computeStreaks, dayKey } from "@/lib/stats-utils";
 import { todayInTashkent, type ProgressUnit, type ReadingFormat, type ShelfStatus } from "@/lib/shelf-types";
 import { createAdminClient } from "@/lib/supabase/admin";
 
@@ -44,7 +45,9 @@ function progressLine(unit: string, current: number, total: number | null) {
 const siteButton = (): InlineButton[] => [{ text: t.openSite, web_app: { url: appUrl() } }];
 
 async function profileByTelegram(db: SupabaseClient, telegramId: number) {
-  const { data } = await db.from("profiles").select("id, display_name, yearly_goal").eq("telegram_id", telegramId).maybeSingle();
+  const { data: link } = await db.from("telegram_accounts").select("user_id").eq("telegram_id", telegramId).maybeSingle();
+  if (!link) return null;
+  const { data } = await db.from("profiles").select("id, display_name, yearly_goal").eq("id", link.user_id).maybeSingle();
   return (data as Profile | null) ?? null;
 }
 
@@ -61,8 +64,10 @@ async function linkAccount(db: SupabaseClient, chatId: number, from: TgUser, tok
     return "link_expired";
   }
   // Bir Telegram hisobi faqat bitta profilga bogʻlanadi
-  await db.from("profiles").update({ telegram_id: null }).eq("telegram_id", from.id).neq("id", link.user_id);
-  const { error } = await db.from("profiles").update({ telegram_id: from.id }).eq("id", link.user_id);
+  await db.from("telegram_accounts").delete().eq("telegram_id", from.id).neq("user_id", link.user_id);
+  const { error } = await db
+    .from("telegram_accounts")
+    .upsert({ user_id: link.user_id, telegram_id: from.id, linked_at: new Date().toISOString() }, { onConflict: "user_id" });
   await db.from("telegram_link_tokens").delete().eq("user_id", link.user_id);
   if (error) {
     await sendMessage(chatId, t.error);
@@ -159,17 +164,11 @@ async function sendStats(db: SupabaseClient, chatId: number, profile: Profile) {
   ]);
 
   // Faol kunlar (Toshkent vaqti) va ketma-ket kunlar (streak)
-  const days = new Set(
-    (sessions ?? []).map((s) => new Date(s.created_at).toLocaleDateString("en-CA", { timeZone: "Asia/Tashkent" })),
-  );
-  let streak = 0;
-  const cursor = new Date(`${todayInTashkent()}T12:00:00+05:00`);
-  if (!days.has(todayInTashkent())) cursor.setUTCDate(cursor.getUTCDate() - 1); // bugun hali oʻqimagan boʻlsa kechadan sanaymiz
-  while (days.has(cursor.toLocaleDateString("en-CA", { timeZone: "Asia/Tashkent" }))) {
-    streak++;
-    cursor.setUTCDate(cursor.getUTCDate() - 1);
-  }
-  const week = [...days].filter((d) => d >= new Date(Date.now() - 6 * 86_400_000).toLocaleDateString("en-CA", { timeZone: "Asia/Tashkent" })).length;
+  const today = todayInTashkent();
+  const days = new Set((sessions ?? []).map((s) => dayKey(s.created_at)));
+  const { current: streak } = computeStreaks(days, today);
+  const weekStart = addDays(today, -6);
+  const week = [...days].filter((d) => d >= weekStart).length;
 
   const goal = profile.yearly_goal ? ` / ${profile.yearly_goal}\n<code>${drawBar(readThisYear ?? 0, profile.yearly_goal)}</code>` : "";
   await sendMessage(

@@ -24,3 +24,13 @@ export function formatDate(value: string | Date | null | undefined): string | nu
     .format(d)
     .replace(/\//g, ".");
 }
+
+// "2 soat oldin" — faqat server komponentlarda (render paytidagi vaqt bilan hisoblanadi)
+export function timeAgo(iso: string, now: number, t: { now: string; minutes: (n: number) => string; hours: (n: number) => string; days: (n: number) => string }) {
+  const minutes = Math.floor((now - Date.parse(iso)) / 60_000);
+  if (minutes < 1) return t.now;
+  if (minutes < 60) return t.minutes(minutes);
+  if (minutes < 60 * 24) return t.hours(Math.floor(minutes / 60));
+  if (minutes < 60 * 24 * 30) return t.days(Math.floor(minutes / (60 * 24)));
+  return formatDate(iso);
+}

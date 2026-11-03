@@ -2,6 +2,7 @@ import Link from "next/link";
 import { Suspense } from "react";
 import { Container } from "@/components/ui/container";
 import { buttonClasses } from "@/components/ui/button";
+import { ScriptToggle } from "@/components/script-toggle";
 import { ThemeToggle } from "@/components/theme-toggle";
 import { UserNav } from "@/components/user-nav";
 import { uz } from "@/lib/i18n/uz";
@@ -10,6 +11,7 @@ import { site } from "@/lib/site";
 const links = [
   { href: "/kitoblar", label: uz.nav.catalog },
   { href: "/javonim", label: uz.nav.shelves },
+  { href: "/lenta", label: uz.nav.feed },
   { href: "/qaydlar", label: uz.nav.notes },
   { href: "/statistika", label: uz.nav.stats },
 ];
@@ -39,6 +41,7 @@ export function SiteHeader() {
           ))}
         </nav>
         <div className="ml-auto flex items-center gap-1">
+          <ScriptToggle />
           <ThemeToggle />
           <Suspense fallback={<span className="inline-block h-8 w-16" />}>
             <UserNav />
