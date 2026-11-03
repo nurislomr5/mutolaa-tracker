@@ -89,6 +89,7 @@ async function BookView({ params }: { params: PageProps<"/kitob/[slug]">["params
               </Badge>
             ))}
             {book.is_premium && <Badge tone="warning">{t.premium}</Badge>}
+            {book.source === "user" && <Badge>{uz.addBook.userAdded}</Badge>}
           </div>
 
           <h1 className="font-serif text-3xl font-semibold leading-tight sm:text-4xl">{book.title}</h1>

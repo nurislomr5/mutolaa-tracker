@@ -113,9 +113,14 @@ async function ShelfView({ searchParams }: { searchParams: PageProps<"/javonim">
       ) : (
         <div className="py-16 text-center">
           <p className="text-muted">{status ? uz.shelf.empty[status] : uz.catalog.empty}</p>
-          <Link href="/kitoblar" className={buttonClasses({ className: "mt-6" })}>
-            {uz.shelf.findBooks}
-          </Link>
+          <div className="mt-6 flex flex-wrap justify-center gap-3">
+            <Link href="/kitoblar" className={buttonClasses()}>
+              {uz.shelf.findBooks}
+            </Link>
+            <Link href="/kitob-qoshish" className={buttonClasses({ variant: "secondary" })}>
+              {uz.addBook.ctaShort}
+            </Link>
+          </div>
         </div>
       )}
     </>

@@ -144,7 +144,19 @@ async function Catalog({ searchParams }: { searchParams: Promise<SearchParams> }
         )}
       </div>
 
-      {books.length ? <BookGrid books={books} priorityCount={6} /> : <p className="py-16 text-center text-muted">{t.empty}</p>}
+      {books.length ? (
+        <BookGrid books={books} priorityCount={6} />
+      ) : (
+        <div className="py-16 text-center">
+          <p className="text-muted">{t.empty}</p>
+          <Link
+            href={query.q ? `/kitob-qoshish?nom=${encodeURIComponent(query.q)}` : "/kitob-qoshish"}
+            className={buttonClasses({ className: "mt-6" })}
+          >
+            {uz.addBook.cta}
+          </Link>
+        </div>
+      )}
 
       {pages > 1 && (
         <nav className="mt-10 flex items-center justify-center gap-3" aria-label="Sahifalar">
@@ -174,9 +186,14 @@ export default function CatalogPage(props: PageProps<"/kitoblar">) {
     <Container className="py-8 sm:py-10">
       <div className="flex flex-wrap items-baseline justify-between gap-2">
         <h1 className="font-serif text-3xl font-semibold">{uz.catalog.title}</h1>
-        <Link href="/nashriyotlar" className="text-sm text-accent hover:underline">
-          {uz.publishers.allPublishers}
-        </Link>
+        <div className="flex gap-4 text-sm">
+          <Link href="/kitob-qoshish" className="text-accent hover:underline">
+            {uz.addBook.ctaShort}
+          </Link>
+          <Link href="/nashriyotlar" className="text-accent hover:underline">
+            {uz.publishers.allPublishers}
+          </Link>
+        </div>
       </div>
       <p className="mb-6 mt-1 text-muted">{uz.catalog.description}</p>
       <Suspense
