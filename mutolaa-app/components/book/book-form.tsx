@@ -1,10 +1,11 @@
 "use client";
 
 import Link from "next/link";
-import { startTransition, useActionState, useRef } from "react";
+import { startTransition, useActionState, useEffect, useRef } from "react";
 import { addBook, type AddBookState } from "@/app/actions/add-book";
 import { editBook } from "@/app/actions/edit-book";
 import { BookCover } from "@/components/book/book-cover";
+import { CoverPicker } from "@/components/book/cover-picker";
 import { FormatIcon } from "@/components/book/format-icons";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -31,6 +32,11 @@ export function BookForm({
   const formRef = useRef<HTMLFormElement>(null);
   const [state, action, pending] = useActionState<AddBookState, FormData>(mode === "add" ? addBook : editBook, null);
   const formats = initial.formats ?? ["paper"];
+
+  // Tahrirlash saqlangach — toʻliq sahifa yuklash (yangi muqova/maʼlumot kafolatlangan koʻrinadi)
+  useEffect(() => {
+    if (state?.ok) window.location.assign(state.redirectTo);
+  }, [state]);
 
   return (
     <form ref={formRef} action={action} className="space-y-5">
@@ -91,11 +97,7 @@ export function BookForm({
         </datalist>
       </label>
 
-      <label className={label}>
-        {t.coverUrl}
-        <Input name="cover_url" type="url" maxLength={500} placeholder="https://" defaultValue={initial.cover_url} className="mt-1" />
-        <span className={hint}>{t.coverHint}</span>
-      </label>
+      <CoverPicker initialUrl={initial.cover_url} title={initial.title} />
 
       <label className={label}>
         {t.description}

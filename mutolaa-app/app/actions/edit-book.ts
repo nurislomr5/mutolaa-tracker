@@ -1,10 +1,9 @@
 "use server";
 
 import { updateTag } from "next/cache";
-import { redirect } from "next/navigation";
 import { z } from "zod";
 import { bookInputSchema, parseAuthors } from "@/lib/book-input";
-import { bookColumns, linkAuthors, resolvePublisher } from "@/lib/book-write";
+import { bookColumns, linkAuthors, removeCover, resolvePublisher, uploadCover } from "@/lib/book-write";
 import { uz } from "@/lib/i18n/uz";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { getSessionUser } from "@/lib/supabase/server";
@@ -25,16 +24,27 @@ export async function editBook(_prev: AddBookState, formData: FormData): Promise
   if (!authors.length) return { ok: false, error: uz.addBook.invalid };
 
   const admin = createAdminClient();
-  const { data: book } = await admin.from("books").select("id, source, created_by").eq("slug", input.slug).maybeSingle();
+  const { data: book } = await admin.from("books").select("id, source, created_by, cover_url").eq("slug", input.slug).maybeSingle();
   if (!book || book.source !== "user" || book.created_by !== user.id) return { ok: false, error: uz.editBook.forbidden };
+
+  const cover = await uploadCover(admin, user.id, formData.get("cover_file"));
+  if (cover && "error" in cover) return { ok: false, error: cover.error };
+  const columns = { ...bookColumns(input, authors), ...(cover ? { cover_url: cover.url } : {}) };
 
   const { error } = await admin
     .from("books")
-    .update({ ...bookColumns(input, authors), ...(await resolvePublisher(admin, input.publisher)) })
+    .update({ ...columns, ...(await resolvePublisher(admin, input.publisher)) })
     .eq("id", book.id);
-  if (error) return { ok: false, error: uz.common.error };
+  if (error) {
+    await removeCover(admin, cover?.url);
+    return { ok: false, error: uz.common.error };
+  }
+  // Muqova almashgan yoki olib tashlangan boʻlsa — bizning bucket'dagi eski faylni oʻchiramiz
+  if (book.cover_url && book.cover_url !== columns.cover_url) await removeCover(admin, book.cover_url);
   await linkAuthors(admin, book.id, authors, true);
 
   updateTag("catalog");
-  redirect(`/kitob/${input.slug}`);
+  // Server redirect oʻrniga manzilni qaytaramiz — forma sahifani toʻliq qayta yuklaydi.
+  // Sabab: action'dan keyingi client yoʻnaltirishda muqova olib tashlanganda eski rasm DOM'da qolib ketardi.
+  return { ok: true, redirectTo: `/kitob/${input.slug}` };
 }

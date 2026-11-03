@@ -4,7 +4,7 @@ import { updateTag } from "next/cache";
 import { redirect } from "next/navigation";
 import { z } from "zod";
 import { bookInputSchema, parseAuthors } from "@/lib/book-input";
-import { bookColumns, linkAuthors, resolvePublisher } from "@/lib/book-write";
+import { bookColumns, linkAuthors, removeCover, resolvePublisher, uploadCover } from "@/lib/book-write";
 import { uz } from "@/lib/i18n/uz";
 import { setStatusFor } from "@/lib/shelf-ops";
 import { STATUSES } from "@/lib/shelf-types";
@@ -21,6 +21,7 @@ export type DuplicateBook = { slug: string; title: string; author_names: string 
 export type AddBookState =
   | { ok: false; error: string; duplicates?: undefined }
   | { ok: false; error?: undefined; duplicates: DuplicateBook[] }
+  | { ok: true; redirectTo: string; error?: undefined; duplicates?: undefined }
   | null;
 
 const schema = bookInputSchema.extend({
@@ -77,18 +78,26 @@ export async function addBook(_prev: AddBookState, formData: FormData): Promise<
     slug = `${base}-${i}`;
   }
 
+  // Muqova faqat kitob haqiqatan yaratilayotganda yuklanadi (takror topilganda ortiqcha fayl qolmasin)
+  const cover = await uploadCover(admin, user.id, formData.get("cover_file"));
+  if (cover && "error" in cover) return { ok: false, error: cover.error };
+
   const { data: book, error } = await admin
     .from("books")
     .insert({
       slug,
       ...bookColumns(input, authors),
+      ...(cover ? { cover_url: cover.url } : {}),
       ...(await resolvePublisher(admin, input.publisher)),
       source: "user",
       created_by: user.id,
     })
     .select("id")
     .single();
-  if (error || !book) return { ok: false, error: uz.common.error };
+  if (error || !book) {
+    await removeCover(admin, cover?.url);
+    return { ok: false, error: uz.common.error };
+  }
   await linkAuthors(admin, book.id, authors);
 
   // Qoʻshgan foydalanuvchining javoniga (RLS'li oʻz klienti bilan)
