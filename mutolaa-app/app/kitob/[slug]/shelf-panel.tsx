@@ -41,7 +41,7 @@ export async function MyBookSection({ book }: { book: BookDetail }) {
       <Card>
         <CardTitle>{t.progress}</CardTitle>
         <div className="mt-4">
-          <ProgressForm userBook={userBook} audioMinutes={audioMinutes} />
+          <ProgressForm userBook={userBook} audioMinutes={audioMinutes} pageCount={book.page_count} />
         </div>
         {(userBook.started_at || userBook.finished_at) && (
           <p className="mt-4 text-xs text-muted">

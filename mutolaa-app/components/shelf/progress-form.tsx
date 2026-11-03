@@ -16,10 +16,12 @@ const UNIT_FOR: Record<ReadingFormat, ProgressUnit> = { paper: "pages", ebook: "
 export function ProgressForm({
   userBook,
   audioMinutes,
+  pageCount,
   compact = false,
 }: {
   userBook: Pick<UserBook, "id" | "format" | "unit" | "current_value" | "total_value">;
   audioMinutes?: number | null;
+  pageCount?: number | null; // qogʻoz nashr betlar soni (katalogdan)
   compact?: boolean;
 }) {
   const t = uz.shelf;
@@ -41,7 +43,16 @@ export function ProgressForm({
   // Birlik oʻzgarsa, hozirgi joyni proporsional oʻgiramiz va jami qiymatni toʻldiramiz
   function changeUnit(u: ProgressUnit) {
     const pct = Number(total) > 0 ? Number(current) / Number(total) : 0;
-    const nextTotal = u === "percent" ? 100 : u === "minutes" && audioMinutes ? audioMinutes : u === unit ? Number(total) : 0;
+    const nextTotal =
+      u === "percent"
+        ? 100
+        : u === "minutes" && audioMinutes
+          ? audioMinutes
+          : u === "pages" && pageCount
+            ? pageCount
+            : u === unit
+              ? Number(total)
+              : 0;
     setUnit(u);
     setTotal(nextTotal ? String(nextTotal) : "");
     setCurrent(nextTotal ? String(Math.round(pct * nextTotal)) : "");

@@ -11,9 +11,14 @@ export function SiteFooter() {
         </span>
         <span>
           {uz.footer.catalogSource}{" "}
-          <a href={site.sourceUrl} target="_blank" rel="noreferrer" className="font-medium text-accent hover:underline">
-            {site.sourceName}
-          </a>
+          {site.sources.map((s, i) => (
+            <span key={s.url}>
+              {i > 0 && ", "}
+              <a href={s.url} target="_blank" rel="noreferrer" className="font-medium text-accent hover:underline">
+                {s.name}
+              </a>
+            </span>
+          ))}
           . {uz.footer.disclaimer}
         </span>
       </Container>

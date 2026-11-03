@@ -5,6 +5,7 @@ import { Suspense } from "react";
 import { BookCover } from "@/components/book/book-cover";
 import { BookGrid } from "@/components/book/book-card";
 import { FormatIcon } from "@/components/book/format-icons";
+import { SOURCE_NAMES, WhereToGet } from "@/components/book/where-to-get";
 import { Badge } from "@/components/ui/badge";
 import { buttonClasses } from "@/components/ui/button";
 import { Container } from "@/components/ui/container";
@@ -116,7 +117,8 @@ async function BookView({ params }: { params: PageProps<"/kitob/[slug]">["params
             <Suspense fallback={<div className="h-11 animate-pulse rounded-lg bg-surface-2" />}>
               <ShelfActions book={book} />
             </Suspense>
-            {book.source_url && (
+            {/* manbalar roʻyxati boʻlmagan (eski/qoʻlda qoʻshilgan) kitoblar uchun */}
+            {book.sources.length === 0 && book.source_url && (
               <a href={book.source_url} target="_blank" rel="noreferrer" className={buttonClasses({ size: "lg", variant: "secondary" })}>
                 {t.openOnMutolaa} ↗
               </a>
@@ -124,11 +126,27 @@ async function BookView({ params }: { params: PageProps<"/kitob/[slug]">["params
           </div>
 
           <dl className="mt-8 grid grid-cols-2 gap-4 border-y border-border py-5 sm:grid-cols-4">
+            {book.publisherRef && (
+              <Fact
+                label={t.publisherLabel}
+                value={
+                  <Link href={`/nashriyot/${book.publisherRef.slug}`} className="text-accent hover:underline">
+                    {book.publisherRef.name}
+                  </Link>
+                }
+              />
+            )}
+            {!book.publisherRef && book.publisher && <Fact label={t.publisher} value={book.publisher} />}
+            {book.page_count && <Fact label={t.pages} value={book.page_count} />}
+            {book.published_year && <Fact label={t.year} value={book.published_year} />}
+            {book.translator && <Fact label={t.translator} value={book.translator} />}
             {duration && <Fact label={t.duration} value={duration} />}
             {book.narrator && <Fact label={t.narrator} value={book.narrator} />}
             {book.age_limit != null && <Fact label={t.age} value={`${book.age_limit}+`} />}
-            {book.publisher && <Fact label={t.publisher} value={book.publisher} />}
+            {/* yozuv va ISBN nashrga xos — "Qayerdan olish" roʻyxatida har bir nashr yonida */}
           </dl>
+
+          <WhereToGet sources={book.sources} />
 
           {(book.topics.length > 0 || genres.length > 0) && (
             <div className="mt-5 flex flex-wrap gap-2">
@@ -168,7 +186,9 @@ async function BookView({ params }: { params: PageProps<"/kitob/[slug]">["params
             </details>
           )}
 
-          <p className="mt-8 text-xs text-muted">{t.source}</p>
+          {book.sources.length > 0 && (
+            <p className="mt-8 text-xs text-muted">{t.source([...new Set(book.sources.map((s) => SOURCE_NAMES[s.source]))].join(", "))}</p>
+          )}
         </div>
       </div>
 

@@ -2,6 +2,9 @@
 export const site = {
   name: "Sahifa",
   description: "Oʻqigan, oʻqiyotgan va oʻqimoqchi boʻlgan kitoblaringizni oʻzbek tilida kuzating.",
-  sourceName: "Mutolaa",
-  sourceUrl: "https://mutolaa.com",
+  // katalog maʼlumoti manbalari (futerda koʻrsatiladi)
+  sources: [
+    { name: "Mutolaa", url: "https://mutolaa.com" },
+    { name: "Asaxiy", url: "https://asaxiy.uz/product/knigi" },
+  ],
 };

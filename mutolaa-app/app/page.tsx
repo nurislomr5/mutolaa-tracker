@@ -3,7 +3,7 @@ import { Container } from "@/components/ui/container";
 import { Card, CardTitle } from "@/components/ui/card";
 import { buttonClasses } from "@/components/ui/button";
 import { BookGrid } from "@/components/book/book-card";
-import { getPopularBooks, getTopics } from "@/lib/catalog";
+import { getNewPaperBooks, getPopularBooks, getPublishers, getTopics } from "@/lib/catalog";
 import { Suspense } from "react";
 import { BookCover } from "@/components/book/book-cover";
 import { Progress } from "@/components/ui/progress";
@@ -43,9 +43,29 @@ async function NowReading() {
 }
 
 async function Popular() {
-  const [books, topics] = await Promise.all([getPopularBooks(12), getTopics()]);
+  const [books, topics, newBooks, publishers] = await Promise.all([
+    getPopularBooks(12),
+    getTopics(),
+    getNewPaperBooks(12),
+    getPublishers(),
+  ]);
   return (
     <Container className="py-14">
+      {newBooks.length > 0 && (
+        <section className="mb-14">
+          <div className="mb-5 flex items-baseline justify-between gap-4">
+            <div>
+              <h2 className="font-serif text-2xl font-semibold">{uz.publishers.newBooks}</h2>
+              <p className="text-sm text-muted">{uz.publishers.newBooksHint}</p>
+            </div>
+            <Link href="/kitoblar?format=paper&sort=new" className="shrink-0 text-sm text-accent hover:underline">
+              {uz.popular.seeAll}
+            </Link>
+          </div>
+          <BookGrid books={newBooks} />
+        </section>
+      )}
+
       <div className="mb-5 flex items-baseline justify-between">
         <h2 className="font-serif text-2xl font-semibold">{uz.popular.title}</h2>
         <Link href="/kitoblar" className="text-sm text-accent hover:underline">
@@ -53,6 +73,28 @@ async function Popular() {
         </Link>
       </div>
       <BookGrid books={books} />
+
+      {publishers.length > 0 && (
+        <>
+          <div className="mb-4 mt-14 flex items-baseline justify-between">
+            <h2 className="font-serif text-2xl font-semibold">{uz.publishers.title}</h2>
+            <Link href="/nashriyotlar" className="text-sm text-accent hover:underline">
+              {uz.publishers.allPublishers}
+            </Link>
+          </div>
+          <div className="flex flex-wrap gap-2">
+            {publishers.slice(0, 16).map((p) => (
+              <Link
+                key={p.slug}
+                href={`/nashriyot/${p.slug}`}
+                className="rounded-full border border-border bg-surface px-3 py-1 text-sm text-muted transition-colors hover:text-text"
+              >
+                {p.name} <span className="text-xs opacity-70">{p.count}</span>
+              </Link>
+            ))}
+          </div>
+        </>
+      )}
 
       <h2 className="mb-4 mt-14 font-serif text-2xl font-semibold">{uz.popular.topicsTitle}</h2>
       <div className="flex flex-wrap gap-2">

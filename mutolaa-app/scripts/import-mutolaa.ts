@@ -10,17 +10,11 @@
  *
  * Kerakli env: NEXT_PUBLIC_SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY (dry-run uchun shart emas)
  */
-import { existsSync, readFileSync } from "node:fs";
-import { parseEnv } from "node:util";
 import { createClient, type SupabaseClient } from "@supabase/supabase-js";
 import { slugify } from "../lib/text/normalize";
+import { loadEnv } from "./lib/common";
 
-// .env.local tizim muhitidagi qiymatlardan ustun turadi: kompyuterda boshqa loyihaning
-// NEXT_PUBLIC_SUPABASE_URL o'zgaruvchisi bo'lsa ham, import faqat shu ilova bazasiga yozadi.
-// CI'da (.env.local yo'q) GitHub secrets ishlatiladi.
-if (existsSync(".env.local")) {
-  Object.assign(process.env, parseEnv(readFileSync(".env.local", "utf8")));
-}
+loadEnv();
 
 const BASE = "https://mutolaa.com";
 const USER_AGENT = "SahifaCatalogBot/1.0 (Uzbek book tracker; metadata only)";
@@ -384,13 +378,31 @@ async function flush(
   await caches.genres.resolve(batch.flatMap((b) => b.genres));
   await caches.topics.resolve(batch.flatMap((b) => b.topics));
 
-  const { data: saved, error } = await db
-    .from("books")
-    .upsert(batch.map((b) => b.book), { onConflict: "slug" })
-    .select("id, slug");
+  // Boshqa manbalar (Asaxiy) qoʻshgan formatlarni ("paper") oʻchirib yubormaslik uchun mavjudlari bilan birlashtiramiz
+  const { data: existing } = await db.from("books").select("slug, formats").in("slug", batch.map((b) => b.book.slug));
+  const oldFormats = new Map((existing ?? []).map((r) => [r.slug as string, r.formats as string[]]));
+  const rows = batch.map((b) => ({ ...b.book, formats: [...new Set([...b.book.formats, ...(oldFormats.get(b.book.slug) ?? [])])] }));
+
+  const { data: saved, error } = await db.from("books").upsert(rows, { onConflict: "slug" }).select("id, slug");
   if (error) throw new Error(`books upsert: ${error.message}`);
   const idBySlug = new Map((saved ?? []).map((r) => [r.slug as string, r.id as number]));
   const bookIds = [...idBySlug.values()];
+
+  // Manba yozuvi (koʻp manbali katalog: books — asar, book_sources — qayerda bor)
+  const sources = await db.from("book_sources").upsert(
+    batch.map((b) => ({
+      book_id: idBySlug.get(b.book.slug),
+      source: "mutolaa",
+      external_id: b.book.slug,
+      url: b.book.source_url,
+      formats: b.book.formats,
+      cover_url: b.book.cover_url,
+      language: b.book.language,
+      last_seen_at: new Date().toISOString(),
+    })),
+    { onConflict: "source,external_id" },
+  );
+  if (sources.error) throw new Error(`book_sources upsert: ${sources.error.message}`);
 
   // Bogʻlanishlarni Mutolaa'dagi holatga keltirish: eskilarini oʻchirib, yangilarini yozamiz
   for (const [table, rows] of [

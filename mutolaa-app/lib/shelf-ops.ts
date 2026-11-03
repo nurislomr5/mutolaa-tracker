@@ -5,11 +5,13 @@ import { todayInTashkent, type ProgressUnit, type ReadingFormat, type ShelfStatu
 // Bot RLS'ni chetlab oʻtgani uchun har bir soʻrov user_id bilan aniq cheklanadi.
 
 // Yangi qoʻshilgan kitob uchun format va oʻlchov birligini kitob turidan taxmin qilamiz
-export function defaultsFor(book: { formats: string[]; audio_seconds: number | null }): {
+export function defaultsFor(book: { formats: string[]; audio_seconds: number | null; page_count: number | null }): {
   format: ReadingFormat;
   unit: ProgressUnit;
   total_value: number | null;
 } {
+  // Qogʻoz nashri va betlar soni maʼlum boʻlsa — bet boʻyicha (jami avtomatik toʻladi)
+  if (book.formats.includes("paper") && book.page_count) return { format: "paper", unit: "pages", total_value: book.page_count };
   if (book.formats.includes("ebook")) return { format: "ebook", unit: "percent", total_value: 100 };
   if (book.formats.includes("audio") && book.audio_seconds)
     return { format: "audio", unit: "minutes", total_value: Math.max(1, Math.ceil(book.audio_seconds / 60)) };
@@ -40,7 +42,7 @@ export async function setStatusFor(db: SupabaseClient, userId: string, bookId: n
     return { ok: !error, userBookId: existing.id as number };
   }
 
-  const { data: book } = await db.from("books").select("formats, audio_seconds").eq("id", bookId).maybeSingle();
+  const { data: book } = await db.from("books").select("formats, audio_seconds, page_count").eq("id", bookId).maybeSingle();
   if (!book) return { ok: false, userBookId: null };
   const defaults = defaultsFor(book);
   const { data, error } = await db

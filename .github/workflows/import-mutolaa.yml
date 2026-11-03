@@ -1,7 +1,7 @@
-# Mutolaa katalogini har hafta yangilaydi (yangi kitoblar + 7 kundan eski yozuvlar).
+# Katalogni har hafta yangilaydi: Mutolaa (audio/e-kitob) va Asaxiy (qogʻoz kitoblar, narx, mavjudlik).
 # Repo Settings → Secrets and variables → Actions ga qo'shing:
 #   NEXT_PUBLIC_SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY
-name: Mutolaa katalog importi
+name: Katalog importi
 
 on:
   schedule:
@@ -9,14 +9,14 @@ on:
   workflow_dispatch:
     inputs:
       args:
-        description: "Qo'shimcha argumentlar (masalan: --force yoki --limit 50)"
+        description: "Ikkala importer uchun qo'shimcha argumentlar (masalan: --force yoki --limit 50)"
         required: false
         default: ""
 
 jobs:
   import:
     runs-on: ubuntu-latest
-    timeout-minutes: 120
+    timeout-minutes: 240
     defaults:
       run:
         working-directory: mutolaa-app
@@ -28,7 +28,16 @@ jobs:
           cache: npm
           cache-dependency-path: mutolaa-app/package-lock.json
       - run: npm ci
-      - run: npm run import:mutolaa -- $IMPORT_ARGS
+      - name: Mutolaa
+        run: npm run import:mutolaa -- $IMPORT_ARGS
+        env:
+          IMPORT_ARGS: ${{ inputs.args }}
+          NEXT_PUBLIC_SUPABASE_URL: ${{ secrets.NEXT_PUBLIC_SUPABASE_URL }}
+          SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
+      - name: Asaxiy
+        # Mutolaa muvaffaqiyatsiz boʻlsa ham Asaxiy yangilanaversin
+        if: ${{ !cancelled() }}
+        run: npm run import:asaxiy -- $IMPORT_ARGS
         env:
           IMPORT_ARGS: ${{ inputs.args }}
           NEXT_PUBLIC_SUPABASE_URL: ${{ secrets.NEXT_PUBLIC_SUPABASE_URL }}
