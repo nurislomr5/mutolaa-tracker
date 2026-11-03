@@ -47,6 +47,7 @@ async function main() {
 
   const commands = await call("setMyCommands", {
     commands: [
+      { command: "login", description: "Saytga kirish havolasi" },
       { command: "status", description: "Hozir oʻqiyotganlarim" },
       { command: "savollar", description: "Ochiq savollar" },
       { command: "qidir", description: "Katalogdan kitob qidirish" },

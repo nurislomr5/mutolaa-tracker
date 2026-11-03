@@ -7,12 +7,14 @@ import { uz } from "@/lib/i18n/uz";
 import { sendLoginEmail, signInWithGoogle, verifyLoginCode, type LoginState } from "./actions";
 
 // "Boshqa email" bosilganda key oʻzgaradi va forma holati (useActionState) toʻliq tozalanadi
-export function LoginForm(props: { next: string; initialError?: string }) {
+type Props = { next: string; initialError?: string; googleEnabled: boolean; telegramUrl: string | null };
+
+export function LoginForm(props: Props) {
   const [attempt, setAttempt] = useState(0);
   return <LoginFlow key={attempt} {...props} initialError={attempt ? undefined : props.initialError} onReset={() => setAttempt((n) => n + 1)} />;
 }
 
-function LoginFlow({ next, initialError, onReset }: { next: string; initialError?: string; onReset: () => void }) {
+function LoginFlow({ next, initialError, onReset, googleEnabled, telegramUrl }: Props & { onReset: () => void }) {
   const t = uz.auth;
   const [sent, sendAction, sending] = useActionState(sendLoginEmail, { step: "email" } as LoginState);
   const [verified, verifyAction, verifying] = useActionState(verifyLoginCode, { step: "code", email: "" } as LoginState);
@@ -54,6 +56,27 @@ function LoginFlow({ next, initialError, onReset }: { next: string; initialError
 
   return (
     <div>
+      {telegramUrl && (
+        <>
+          <a
+            href={telegramUrl}
+            target="_blank"
+            rel="noreferrer"
+            className="flex h-12 w-full items-center justify-center gap-2 rounded-lg bg-[#229ED9] font-medium text-white hover:bg-[#1d8cc0]"
+          >
+            <svg className="h-5 w-5" viewBox="0 0 24 24" fill="currentColor" aria-hidden>
+              <path d="M9.8 15.3 9.6 19c.4 0 .6-.2.8-.4l2-1.9 4.1 3c.8.4 1.3.2 1.5-.7l2.7-12.7c.3-1.1-.4-1.6-1.2-1.3L3.7 10.6c-1.1.4-1.1 1-.2 1.3l4.1 1.3 9.6-6c.5-.3.9-.1.5.2" />
+            </svg>
+            {t.telegram}
+          </a>
+          <p className="mt-2 text-center text-xs text-muted">{t.telegramHint}</p>
+          <div className="my-6 flex items-center gap-3 text-xs text-muted">
+            <span className="h-px flex-1 bg-border" />
+            {t.or}
+            <span className="h-px flex-1 bg-border" />
+          </div>
+        </>
+      )}
       <form action={sendAction} className="space-y-3">
         <input type="hidden" name="next" value={next} />
         <label className="block text-sm font-medium" htmlFor="email">
@@ -75,6 +98,8 @@ function LoginFlow({ next, initialError, onReset }: { next: string; initialError
         </Button>
       </form>
 
+      {googleEnabled && (
+        <>
       <div className="my-6 flex items-center gap-3 text-xs text-muted">
         <span className="h-px flex-1 bg-border" />
         {t.or}
@@ -93,6 +118,8 @@ function LoginFlow({ next, initialError, onReset }: { next: string; initialError
           {t.google}
         </Button>
       </form>
+        </>
+      )}
     </div>
   );
 }

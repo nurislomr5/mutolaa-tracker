@@ -7,6 +7,7 @@ import { applyProgress, setStatusFor } from "@/lib/shelf-ops";
 import { addDays, computeStreaks, dayKey } from "@/lib/stats-utils";
 import { todayInTashkent, type ProgressUnit, type ReadingFormat, type ShelfStatus } from "@/lib/shelf-types";
 import { createAdminClient } from "@/lib/supabase/admin";
+import { createLoginLink } from "@/lib/bot/login";
 
 // Telegram webhook mantiqi. Bot service role bilan ishlaydi — har bir soʻrov profil user_id si bilan cheklanadi.
 
@@ -321,6 +322,17 @@ export async function handleUpdate(update: TgUpdate): Promise<string> {
   const text = msg.text?.trim() ?? "";
 
   // /start <token> — hisobni bogʻlash (bogʻlanmagan foydalanuvchi uchun ham ishlaydi)
+  // /start login yoki /login — saytga kirish havolasi (hisob boʻlmasa yaratiladi)
+  if (/^\/(?:start(?:@\w+)?\s+login|login(?:@\w+)?)$/.test(text)) {
+    const url = await createLoginLink(db, msg.from);
+    if (!url) {
+      await sendMessage(chatId, t.error);
+      return "login_failed";
+    }
+    await sendMessage(chatId, t.loginLink, [[{ text: t.loginButton, url }]]);
+    return "login_link_sent";
+  }
+
   const start = text.match(/^\/start(?:@\w+)?(?:\s+([A-Za-z0-9_-]{16,64}))?$/);
   if (start?.[1]) return linkAccount(db, chatId, msg.from, start[1]);
 

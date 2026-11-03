@@ -5,6 +5,7 @@ import { signOut } from "@/app/kirish/actions";
 import { Button } from "@/components/ui/button";
 import { Card, CardTitle } from "@/components/ui/card";
 import { Container } from "@/components/ui/container";
+import { isTelegramEmail } from "@/lib/bot/login";
 import { uz } from "@/lib/i18n/uz";
 import { getProfile, isTelegramLinked } from "@/lib/shelf";
 import { getSessionUser } from "@/lib/supabase/server";
@@ -18,12 +19,13 @@ async function Settings() {
   if (!user) redirect("/kirish?next=/sozlamalar");
   const [profile, telegramLinked] = await Promise.all([getProfile(), isTelegramLinked()]);
   const t = uz.settings;
+  const emailLabel = isTelegramEmail(user.email) ? "Telegram orqali kirgan" : user.email;
 
   return (
     <div className="grid gap-4 lg:grid-cols-2">
       <Card>
         <CardTitle>{t.profile}</CardTitle>
-        <p className="mb-5 mt-1 text-sm text-muted">{user.email}</p>
+        <p className="mb-5 mt-1 text-sm text-muted">{emailLabel}</p>
         {profile && <ProfileForm profile={profile} />}
       </Card>
       <div className="space-y-4">
