@@ -13,7 +13,7 @@ import { getAuthor, getBook, getPopularBooks, type BookDetail } from "@/lib/cata
 import { formatCount, formatDuration, formatRating } from "@/lib/format";
 import { uz } from "@/lib/i18n/uz";
 import { ReadersSection } from "./readers";
-import { MyBookSection, ShelfActions } from "./shelf-panel";
+import { EditBookLink, MyBookSection, ShelfActions } from "./shelf-panel";
 
 // Eng mashhur kitoblar build paytida tayyorlanadi, qolganlari birinchi tashrifda keshlanadi
 export async function generateStaticParams() {
@@ -90,6 +90,9 @@ async function BookView({ params }: { params: PageProps<"/kitob/[slug]">["params
             ))}
             {book.is_premium && <Badge tone="warning">{t.premium}</Badge>}
             {book.source === "user" && <Badge>{uz.addBook.userAdded}</Badge>}
+            <Suspense fallback={null}>
+              <EditBookLink book={book} />
+            </Suspense>
           </div>
 
           <h1 className="font-serif text-3xl font-semibold leading-tight sm:text-4xl">{book.title}</h1>

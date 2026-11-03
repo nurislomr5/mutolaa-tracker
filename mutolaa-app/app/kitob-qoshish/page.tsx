@@ -4,7 +4,7 @@ import { Card } from "@/components/ui/card";
 import { Container } from "@/components/ui/container";
 import { getPublishers } from "@/lib/catalog";
 import { uz } from "@/lib/i18n/uz";
-import { AddBookForm } from "./add-book-form";
+import { BookForm } from "@/components/book/book-form";
 
 export const metadata: Metadata = { title: uz.addBook.title };
 
@@ -13,7 +13,7 @@ async function Form({ searchParams }: { searchParams: PageProps<"/kitob-qoshish"
   const sp = await searchParams;
   const initialTitle = typeof sp.nom === "string" ? sp.nom.slice(0, 200) : "";
   const publishers = (await getPublishers()).map((p) => p.name);
-  return <AddBookForm initialTitle={initialTitle} publishers={publishers} />;
+  return <BookForm mode="add" initial={{ title: initialTitle }} publishers={publishers} />;
 }
 
 export default function AddBookPage(props: PageProps<"/kitob-qoshish">) {

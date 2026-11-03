@@ -3,6 +3,8 @@
 import { updateTag } from "next/cache";
 import { redirect } from "next/navigation";
 import { z } from "zod";
+import { bookInputSchema, parseAuthors } from "@/lib/book-input";
+import { bookColumns, linkAuthors, resolvePublisher } from "@/lib/book-write";
 import { uz } from "@/lib/i18n/uz";
 import { setStatusFor } from "@/lib/shelf-ops";
 import { STATUSES } from "@/lib/shelf-types";
@@ -21,30 +23,7 @@ export type AddBookState =
   | { ok: false; error?: undefined; duplicates: DuplicateBook[] }
   | null;
 
-const currentYear = new Date().getFullYear();
-const optionalInt = (min: number, max: number) =>
-  z.preprocess((v) => (v === "" || v == null ? undefined : v), z.coerce.number().int().min(min).max(max).optional());
-
-const schema = z.object({
-  title: z.string().trim().min(1).max(200),
-  authors: z.string().trim().min(1).max(300),
-  formats: z.array(z.enum(["paper", "ebook", "audio"])).min(1),
-  page_count: optionalInt(1, 10_000),
-  publisher: z.string().trim().max(120).optional(),
-  year: optionalInt(1500, currentYear + 1),
-  isbn: z
-    .string()
-    .trim()
-    .transform((v) => v.replace(/[^0-9Xx]/g, "").toUpperCase())
-    .refine((v) => v === "" || v.length === 10 || v.length === 13, "ISBN 10 yoki 13 xonali boʻlishi kerak")
-    .optional(),
-  cover_url: z
-    .string()
-    .trim()
-    .max(500)
-    .refine((v) => v === "" || /^https:\/\/\S+$/.test(v), uz.addBook.coverHint)
-    .optional(),
-  description: z.string().trim().max(3000).optional(),
+const schema = bookInputSchema.extend({
   status: z.enum(STATUSES),
   force: z.literal("1").optional(),
 });
@@ -58,7 +37,7 @@ export async function addBook(_prev: AddBookState, formData: FormData): Promise<
   const parsed = schema.safeParse({ ...Object.fromEntries(formData), formats: formData.getAll("formats") });
   if (!parsed.success) return { ok: false, error: parsed.error.issues[0]?.message ?? uz.addBook.invalid };
   const input = parsed.data;
-  const authors = [...new Set(input.authors.split(",").map((a) => a.trim()).filter(Boolean))].slice(0, 10);
+  const authors = parseAuthors(input.authors);
   if (!authors.length) return { ok: false, error: uz.addBook.invalid };
   const isbn = input.isbn || null;
 
@@ -90,13 +69,6 @@ export async function addBook(_prev: AddBookState, formData: FormData): Promise<
     if (found.size) return { ok: false, duplicates: [...found.values()].slice(0, 4) };
   }
 
-  // Nashriyot katalogda boʻlsa — bogʻlaymiz, aks holda matn sifatida saqlaymiz
-  let publisherId: number | null = null;
-  if (input.publisher) {
-    const { data } = await admin.from("publishers").select("id").eq("slug", slugify(input.publisher)).maybeSingle();
-    publisherId = data?.id ?? null;
-  }
-
   const base = slugify(`${input.title} ${authors[0]}`) || "kitob";
   let slug = base;
   for (let i = 2; ; i++) {
@@ -109,32 +81,15 @@ export async function addBook(_prev: AddBookState, formData: FormData): Promise<
     .from("books")
     .insert({
       slug,
-      title: input.title,
-      author_names: authors.join(", "),
-      description: input.description || null,
-      cover_url: input.cover_url || null,
-      formats: input.formats,
-      page_count: input.page_count ?? null,
-      published_year: input.year ?? null,
-      isbn,
-      publisher_id: publisherId,
-      publisher: publisherId ? null : input.publisher || null,
+      ...bookColumns(input, authors),
+      ...(await resolvePublisher(admin, input.publisher)),
       source: "user",
       created_by: user.id,
     })
     .select("id")
     .single();
   if (error || !book) return { ok: false, error: uz.common.error };
-
-  // Mualliflar: mavjudlarini qayta yozmasdan bogʻlaymiz
-  const authorRows = authors.map((name) => ({ name, slug: slugify(name) })).filter((a) => a.slug);
-  if (authorRows.length) {
-    await admin.from("authors").upsert(authorRows, { onConflict: "slug", ignoreDuplicates: true });
-    const { data: ids } = await admin.from("authors").select("id, slug").in("slug", authorRows.map((a) => a.slug));
-    const bySlug = new Map((ids ?? []).map((a) => [a.slug, a.id]));
-    const links = authorRows.map((a, i) => ({ book_id: book.id, author_id: bySlug.get(a.slug), position: i })).filter((l) => l.author_id);
-    if (links.length) await admin.from("book_authors").insert(links);
-  }
+  await linkAuthors(admin, book.id, authors);
 
   // Qoʻshgan foydalanuvchining javoniga (RLS'li oʻz klienti bilan)
   await setStatusFor(await createServerSupabase(), user.id, book.id, input.status);

@@ -154,6 +154,13 @@ export const uz = {
     invalid: "Maydonlarni tekshiring.",
     userAdded: "Foydalanuvchi qoʻshgan",
   },
+  editBook: {
+    title: "Kitobni tahrirlash",
+    subtitle: "Siz qoʻshgan kitob maʼlumotlarini yangilang. Oʻzgarishlar barcha kitobxonlarga koʻrinadi.",
+    submit: "Saqlash",
+    link: "Tahrirlash",
+    forbidden: "Bu kitobni faqat uni qoʻshgan foydalanuvchi tahrirlay oladi.",
+  },
   publishers: {
     title: "Nashriyotlar",
     description: "Oʻzbekiston nashriyotlari va ularning kitoblari.",

@@ -24,6 +24,7 @@ export type BookCardData = {
 
 export type BookDetail = BookCardData & {
   source: "mutolaa" | "asaxiy" | "user";
+  created_by: string | null;
   description: string | null;
   audio_chapters: { title: string; seconds: number }[] | null;
   narrator: string | null;
@@ -160,7 +161,7 @@ export async function getBook(slug: string) {
     .from("books")
     .select(
       `${CARD_COLUMNS}, description, audio_chapters, narrator, age_limit, publisher, mutolaa_rating_count,
-       mutolaa_reading_count, source, source_url, isbn, page_count, published_year, translator, script,
+       mutolaa_reading_count, source, created_by, source_url, isbn, page_count, published_year, translator, script,
        publisherRef:publishers(name, slug),
        sources:book_sources(source, url, formats, isbn, price, in_stock, page_count, published_year, cover_type, script, publisher:publishers(name, slug)),
        book_authors(position, authors(name, slug, image_url)),

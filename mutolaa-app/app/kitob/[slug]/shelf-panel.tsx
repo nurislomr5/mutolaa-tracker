@@ -27,6 +27,18 @@ export async function ShelfActions({ book }: { book: BookDetail }) {
   return <StatusPicker bookId={book.id} userBookId={userBook?.id} status={userBook?.status} />;
 }
 
+// Foydalanuvchi qoʻshgan kitob — faqat uni qoʻshgan odamga "Tahrirlash" havolasi
+export async function EditBookLink({ book }: { book: BookDetail }) {
+  if (book.source !== "user" || !book.created_by) return null;
+  const user = await getSessionUser();
+  if (user?.id !== book.created_by) return null;
+  return (
+    <Link href={`/kitob/${book.slug}/tahrirlash`} className="text-sm text-accent hover:underline">
+      ✎ {uz.editBook.link}
+    </Link>
+  );
+}
+
 // Kitob javonda boʻlsa: progress, baho, taqriz, qaydlar, maxsus javonlar
 export async function MyBookSection({ book }: { book: BookDetail }) {
   const user = await getSessionUser();
