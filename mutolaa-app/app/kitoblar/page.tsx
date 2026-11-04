@@ -187,6 +187,9 @@ export default function CatalogPage(props: PageProps<"/kitoblar">) {
       <div className="flex flex-wrap items-baseline justify-between gap-2">
         <h1 className="font-serif text-3xl font-semibold">{uz.catalog.title}</h1>
         <div className="flex gap-4 text-sm">
+          <Link href="/skaner" className="text-accent hover:underline">
+            📷 {uz.scanner.title}
+          </Link>
           <Link href="/kitob-qoshish" className="text-accent hover:underline">
             {uz.addBook.ctaShort}
           </Link>

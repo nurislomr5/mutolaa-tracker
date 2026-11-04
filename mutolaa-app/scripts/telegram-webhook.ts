@@ -52,6 +52,7 @@ async function main() {
       { command: "savollar", description: "Ochiq savollar" },
       { command: "qidir", description: "Katalogdan kitob qidirish" },
       { command: "statistika", description: "Yillik natija va streak" },
+      { command: "eslatma", description: "Kunlik eslatma vaqti: /eslatma 21" },
       { command: "yordam", description: "Botdan foydalanish" },
     ],
   });

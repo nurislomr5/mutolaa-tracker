@@ -10,6 +10,7 @@ import { Badge } from "@/components/ui/badge";
 import { buttonClasses } from "@/components/ui/button";
 import { Container } from "@/components/ui/container";
 import { getAuthor, getBook, getPopularBooks, type BookDetail } from "@/lib/catalog";
+import { bookDescription, bookJsonLd } from "@/lib/seo";
 import { formatCount, formatDuration, formatRating } from "@/lib/format";
 import { uz } from "@/lib/i18n/uz";
 import { ReadersSection } from "./readers";
@@ -25,10 +26,14 @@ export async function generateMetadata({ params }: PageProps<"/kitob/[slug]">): 
   const { slug } = await params;
   const book = await getBook(slug);
   if (!book) return { title: uz.notFound.title };
+  const title = book.author_names ? `${book.title} — ${book.author_names}` : book.title;
+  const description = bookDescription(book);
+  // OG rasm shu papkadagi opengraph-image.tsx dan avtomatik qoʻshiladi
   return {
-    title: book.author_names ? `${book.title} — ${book.author_names}` : book.title,
-    description: book.description?.slice(0, 160) ?? undefined,
-    openGraph: { images: book.cover_url ? [book.cover_url] : undefined },
+    title,
+    description,
+    alternates: { canonical: `/kitob/${book.slug}` },
+    openGraph: { title, description, type: "book", url: `/kitob/${book.slug}` },
   };
 }
 
@@ -75,6 +80,7 @@ async function BookView({ params }: { params: PageProps<"/kitob/[slug]">["params
 
   return (
     <>
+      <script type="application/ld+json" dangerouslySetInnerHTML={{ __html: bookJsonLd(book) }} />
       <div className="grid gap-8 md:grid-cols-[240px_1fr] lg:gap-12">
         <div className="mx-auto w-48 md:mx-0 md:w-full">
           <BookCover src={book.cover_url} title={book.title} priority sizes="240px" />

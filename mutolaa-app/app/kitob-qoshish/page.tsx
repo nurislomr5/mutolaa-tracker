@@ -12,8 +12,10 @@ export const metadata: Metadata = { title: uz.addBook.title };
 async function Form({ searchParams }: { searchParams: PageProps<"/kitob-qoshish">["searchParams"] }) {
   const sp = await searchParams;
   const initialTitle = typeof sp.nom === "string" ? sp.nom.slice(0, 200) : "";
+  // skanerdan kelganda ISBN oldindan toʻldiriladi
+  const initialIsbn = typeof sp.isbn === "string" ? sp.isbn.replace(/[^0-9Xx-]/g, "").slice(0, 20) : "";
   const publishers = (await getPublishers()).map((p) => p.name);
-  return <BookForm mode="add" initial={{ title: initialTitle }} publishers={publishers} />;
+  return <BookForm mode="add" initial={{ title: initialTitle, isbn: initialIsbn }} publishers={publishers} />;
 }
 
 export default function AddBookPage(props: PageProps<"/kitob-qoshish">) {

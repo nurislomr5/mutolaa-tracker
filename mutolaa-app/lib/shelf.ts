@@ -104,6 +104,9 @@ export type Profile = {
   avatar_url: string | null;
   yearly_goal: number | null;
   is_public: boolean;
+  reminder_hour: number | null;
+  streak_alerts: boolean;
+  weekly_digest: boolean;
 };
 
 export async function getProfile(): Promise<Profile | null> {
@@ -112,7 +115,7 @@ export async function getProfile(): Promise<Profile | null> {
   const supabase = await createServerSupabase();
   const { data } = await supabase
     .from("profiles")
-    .select("id, username, display_name, avatar_url, yearly_goal, is_public")
+    .select("id, username, display_name, avatar_url, yearly_goal, is_public, reminder_hour, streak_alerts, weekly_digest")
     .eq("id", user.id)
     .maybeSingle();
   return (data as Profile | null) ?? null;

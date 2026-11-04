@@ -10,6 +10,7 @@ import { uz } from "@/lib/i18n/uz";
 import { getProfile, isTelegramLinked } from "@/lib/shelf";
 import { getSessionUser } from "@/lib/supabase/server";
 import { ProfileForm } from "./profile-form";
+import { RemindersForm } from "./reminders-form";
 import { TelegramLink } from "./telegram-link";
 
 export const metadata: Metadata = { title: uz.settings.title };
@@ -34,6 +35,13 @@ async function Settings() {
           <p className="mb-4 mt-2 text-sm text-muted">{t.telegramIntro}</p>
           <TelegramLink linked={telegramLinked} />
         </Card>
+        {profile && (
+          <Card>
+            <CardTitle>{uz.reminders.settingsTitle}</CardTitle>
+            <p className="mb-4 mt-2 text-sm text-muted">{uz.reminders.settingsIntro}</p>
+            <RemindersForm profile={profile} telegramLinked={telegramLinked} />
+          </Card>
+        )}
         <Card>
           <CardTitle>{uz.auth.account}</CardTitle>
           <form action={signOut} className="mt-4">

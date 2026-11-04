@@ -4,6 +4,7 @@ import { updateTag } from "next/cache";
 import { redirect } from "next/navigation";
 import { z } from "zod";
 import { bookInputSchema, parseAuthors } from "@/lib/book-input";
+import { isbnVariants } from "@/lib/isbn";
 import { bookColumns, linkAuthors, removeCover, resolvePublisher, uploadCover } from "@/lib/book-write";
 import { uz } from "@/lib/i18n/uz";
 import { setStatusFor } from "@/lib/shelf-ops";
@@ -52,12 +53,12 @@ export async function addBook(_prev: AddBookState, formData: FormData): Promise<
   // Takrorlar: ISBN yoki "nom + muallif" aniq mos keladiganlar, soʻng nomi oʻxshash kitoblar
   if (!input.force) {
     const found = new Map<string, DuplicateBook>();
-    if (isbn) {
-      // Manbalarda ISBN chiziqchali saqlanadi ("978-9943-23-194-8") — raqamlar ketma-ketligi boʻyicha solishtiramiz
-      const pattern = isbn.split("").join("%");
-      const { data } = await admin.from("books").select(BOOK_CARD).like("isbn", pattern).limit(3);
+    const variants = isbn ? isbnVariants(isbn) : null;
+    if (variants) {
+      // ISBN-10 va ISBN-13 koʻrinishlari boʻyicha (isbn_digits — chiziqchasiz)
+      const { data } = await admin.from("books").select(BOOK_CARD).in("isbn_digits", variants).limit(3);
       for (const b of data ?? []) found.set(b.slug, b);
-      const { data: editions } = await admin.from("book_sources").select(`books!inner(${BOOK_CARD})`).like("isbn", pattern).limit(3);
+      const { data: editions } = await admin.from("book_sources").select(`books!inner(${BOOK_CARD})`).in("isbn_digits", variants).limit(3);
       for (const e of (editions ?? []) as unknown as { books: DuplicateBook }[]) found.set(e.books.slug, e.books);
     }
     const { data: exact } = await admin.from("books").select(BOOK_CARD).eq("search_text", uzNormalize(`${input.title} ${authors.join(", ")}`)).limit(3);

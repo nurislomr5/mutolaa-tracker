@@ -203,13 +203,14 @@ export async function getAuthor(slug: string) {
 
   const { data, error } = await createPublicClient()
     .from("authors")
-    .select(`name, slug, image_url, book_authors(books(${CARD_COLUMNS}, mutolaa_reading_count))`)
+    .select(`id, name, slug, image_url, book_authors(books(${CARD_COLUMNS}, mutolaa_reading_count))`)
     .eq("slug", slug)
     .maybeSingle();
   if (error) fail("Muallif", error.message);
   if (!data) return null;
 
   const row = data as unknown as {
+    id: number;
     name: string;
     slug: string;
     image_url: string | null;
@@ -218,7 +219,7 @@ export async function getAuthor(slug: string) {
   const books = row.book_authors
     .map((ba) => ba.books)
     .sort((a, b) => (b.mutolaa_reading_count ?? 0) - (a.mutolaa_reading_count ?? 0));
-  return { name: row.name, slug: row.slug, image_url: row.image_url, books };
+  return { id: row.id, name: row.name, slug: row.slug, image_url: row.image_url, books };
 }
 
 export async function getPopularAuthorSlugs(limit: number) {
@@ -253,9 +254,9 @@ export async function getPublisher(slug: string) {
   cacheLife("hours");
   cacheTag("catalog");
 
-  const { data, error } = await createPublicClient().from("publishers").select("name, slug").eq("slug", slug).maybeSingle();
+  const { data, error } = await createPublicClient().from("publishers").select("id, name, slug").eq("slug", slug).maybeSingle();
   if (error) fail("Nashriyot", error.message);
-  return (data as { name: string; slug: string } | null) ?? null;
+  return (data as { id: number; name: string; slug: string } | null) ?? null;
 }
 
 // Bosh sahifa: eng soʻnggi qogʻoz nashrlar (chop etilgan yili, soʻng katalogga qoʻshilgani boʻyicha)

@@ -2,7 +2,7 @@ import type { Metadata } from "next";
 import { Inter, Literata } from "next/font/google";
 import { SiteHeader } from "@/components/site-header";
 import { SiteFooter } from "@/components/site-footer";
-import { site } from "@/lib/site";
+import { site, siteUrl } from "@/lib/site";
 import { themeInitScript } from "@/lib/theme";
 import "./globals.css";
 
@@ -18,6 +18,10 @@ const literata = Literata({
 });
 
 export const metadata: Metadata = {
+  // nisbiy OG/canonical manzillar shu domenga bogʻlanadi
+  metadataBase: new URL(siteUrl()),
+  openGraph: { siteName: site.name, locale: "uz_UZ", type: "website" },
+  twitter: { card: "summary_large_image" },
   title: {
     default: `${site.name} — oʻzbekcha kitob kuzatuvchisi`,
     template: `%s · ${site.name}`,

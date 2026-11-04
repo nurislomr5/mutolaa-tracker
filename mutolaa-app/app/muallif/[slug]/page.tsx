@@ -3,6 +3,7 @@ import Image from "next/image";
 import { notFound } from "next/navigation";
 import { Suspense } from "react";
 import { BookGrid, BookGridSkeleton } from "@/components/book/book-card";
+import { FollowEntity } from "@/components/social/follow-entity";
 import { Container } from "@/components/ui/container";
 import { getAuthor, getPopularAuthorSlugs } from "@/lib/catalog";
 import { uz } from "@/lib/i18n/uz";
@@ -15,7 +16,13 @@ export async function generateStaticParams() {
 export async function generateMetadata({ params }: PageProps<"/muallif/[slug]">): Promise<Metadata> {
   const { slug } = await params;
   const author = await getAuthor(slug);
-  return { title: author?.name ?? uz.notFound.title };
+  if (!author) return { title: uz.notFound.title };
+  const titles = author.books.slice(0, 3).map((b) => `«${b.title}»`).join(", ");
+  return {
+    title: author.name,
+    description: `${author.name} — ${author.books.length} ta kitob${titles ? `: ${titles}` : ""}. Oʻqing, tinglang va Sahifa'da kuzating.`,
+    alternates: { canonical: `/muallif/${author.slug}` },
+  };
 }
 
 async function AuthorView({ params }: { params: PageProps<"/muallif/[slug]">["params"] }) {
@@ -34,6 +41,11 @@ async function AuthorView({ params }: { params: PageProps<"/muallif/[slug]">["pa
         <div>
           <h1 className="font-serif text-3xl font-semibold">{author.name}</h1>
           <p className="text-muted">{uz.author.books(author.books.length)}</p>
+          <div className="mt-2">
+            <Suspense fallback={null}>
+              <FollowEntity kind="author" id={author.id} />
+            </Suspense>
+          </div>
         </div>
       </div>
       <BookGrid books={author.books} priorityCount={6} />

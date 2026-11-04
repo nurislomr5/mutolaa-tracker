@@ -3,6 +3,7 @@ import Link from "next/link";
 import { notFound } from "next/navigation";
 import { Suspense } from "react";
 import { BookGrid, BookGridSkeleton } from "@/components/book/book-card";
+import { FollowEntity } from "@/components/social/follow-entity";
 import { buttonClasses } from "@/components/ui/button";
 import { Container } from "@/components/ui/container";
 import { getCatalog, getPublisher, getPublishers, PAGE_SIZE } from "@/lib/catalog";
@@ -16,7 +17,12 @@ export async function generateStaticParams() {
 
 export async function generateMetadata({ params }: PageProps<"/nashriyot/[slug]">): Promise<Metadata> {
   const publisher = await getPublisher((await params).slug);
-  return { title: publisher?.name ?? uz.notFound.title };
+  if (!publisher) return { title: uz.notFound.title };
+  return {
+    title: `${publisher.name} kitoblari`,
+    description: `${publisher.name} nashriyotining kitoblari: narxlar, betlar soni va yangi nashrlar — Sahifa katalogida.`,
+    alternates: { canonical: `/nashriyot/${publisher.slug}` },
+  };
 }
 
 async function PublisherView({ params, searchParams }: PageProps<"/nashriyot/[slug]">) {
@@ -36,6 +42,11 @@ async function PublisherView({ params, searchParams }: PageProps<"/nashriyot/[sl
         </Link>
         <h1 className="mt-2 font-serif text-3xl font-semibold">{publisher.name}</h1>
         <p className="text-muted">{uz.publishers.books(formatCount(total))}</p>
+        <div className="mt-2">
+          <Suspense fallback={null}>
+            <FollowEntity kind="publisher" id={publisher.id} />
+          </Suspense>
+        </div>
       </div>
       <BookGrid books={books} priorityCount={6} />
       {pages > 1 && (

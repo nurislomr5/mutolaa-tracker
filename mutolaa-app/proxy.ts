@@ -2,7 +2,7 @@ import { createServerClient } from "@supabase/ssr";
 import { NextResponse, type NextRequest } from "next/server";
 
 // Faqat kirgan foydalanuvchilar uchun sahifalar
-const PROTECTED = ["/javonim", "/kitob-qoshish", "/lenta", "/qaydlar", "/statistika", "/sozlamalar"];
+const PROTECTED = ["/javonim", "/kitob-qoshish", "/skaner", "/lenta", "/qaydlar", "/statistika", "/sozlamalar"];
 
 // Har bir soʻrovda Supabase sessiyasini yangilaydi va himoyalangan sahifalarga mehmonni /kirish ga yuboradi.
 // Bu faqat optimistik tekshiruv — haqiqiy ruxsat RLS va server action'lardagi getSessionUser() da.
@@ -36,5 +36,5 @@ export async function proxy(request: NextRequest) {
 
 export const config = {
   // statik fayllar, rasmlar va Telegram webhook'dan tashqari hamma sahifalar
-  matcher: ["/((?!_next/static|_next/image|favicon.ico|api/bot|.*\\.(?:svg|png|jpg|jpeg|gif|webp|ico)$).*)"],
+  matcher: ["/((?!_next/static|_next/image|favicon.ico|api/bot|api/cron|.*\\.(?:svg|png|jpg|jpeg|gif|webp|ico)$).*)"],
 };

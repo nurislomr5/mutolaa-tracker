@@ -28,18 +28,18 @@ export type TgUpdate = {
 
 type Profile = { id: string; display_name: string | null; yearly_goal: number | null };
 
-const FORMAT_ICON: Record<string, string> = { paper: "📖", ebook: "📱", audio: "🎧" };
+export const FORMAT_ICON: Record<string, string> = { paper: "📖", ebook: "📱", audio: "🎧" };
 const UNIT_FOR: Record<ReadingFormat, ProgressUnit> = { paper: "pages", ebook: "percent", audio: "minutes" };
 
 const t = uz.bot;
 
-function formatValue(unit: string, value: number) {
+export function formatValue(unit: string, value: number) {
   if (unit === "minutes") return formatDuration(value * 60) ?? "0 daqiqa";
   if (unit === "percent") return `${value}%`;
   return `${value} bet`;
 }
 
-function progressLine(unit: string, current: number, total: number | null) {
+export function progressLine(unit: string, current: number, total: number | null) {
   return total ? `${formatValue(unit, current)} / ${formatValue(unit, total)}` : formatValue(unit, current);
 }
 
@@ -353,6 +353,18 @@ export async function handleUpdate(update: TgUpdate): Promise<string> {
     if (name === "savollar") return sendQuestions(db, chatId, profile.id);
     if (name === "qidir") return sendSearch(db, chatId, arg);
     if (name === "statistika") return sendStats(db, chatId, profile);
+    if (name === "eslatma") {
+      // /eslatma 21 — kunlik eslatma soati (Toshkent), /eslatma off — oʻchirish
+      const value = arg.trim().toLowerCase();
+      const hour = /^\d{1,2}$/.test(value) && Number(value) <= 23 ? Number(value) : null;
+      if (hour === null && !["off", "oʻchir", "o'chir", "ochir"].includes(value)) {
+        await sendMessage(chatId, uz.reminders.botHelp);
+        return "reminder_help";
+      }
+      await db.from("profiles").update({ reminder_hour: hour }).eq("id", profile.id);
+      await sendMessage(chatId, hour === null ? uz.reminders.botOff : uz.reminders.botSet(hour));
+      return hour === null ? "reminder_off" : "reminder_set";
+    }
     await sendMessage(chatId, t.help);
     return "unknown_command";
   }

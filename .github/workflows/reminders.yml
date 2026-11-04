@@ -1,0 +1,22 @@
+# Telegram eslatmalari: har soatda saytning /api/cron/reminders yoʻlini chaqiradi.
+# (Vercel bepul tarifida cron kuniga bir marta bilan cheklangan.)
+# Repo Settings → Secrets and variables → Actions ga qoʻshing: CRON_SECRET (Vercel'dagi bilan bir xil).
+name: Telegram eslatmalari
+
+on:
+  schedule:
+    - cron: "2 * * * *" # har soat boshida (Toshkent vaqti kodda hisoblanadi)
+  workflow_dispatch:
+
+jobs:
+  remind:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - name: Eslatmalarni yuborish
+        run: |
+          curl --fail-with-body -sS -X POST \
+            -H "Authorization: Bearer $CRON_SECRET" \
+            "https://mutolaa-tracker.vercel.app/api/cron/reminders" | head -c 2000
+        env:
+          CRON_SECRET: ${{ secrets.CRON_SECRET }}

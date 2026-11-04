@@ -4,10 +4,7 @@ import { cacheLife } from "next/cache";
 
 const token = () => (process.env.TELEGRAM_BOT_TOKEN ?? "").trim();
 
-export function appUrl() {
-  const raw = (process.env.NEXT_PUBLIC_APP_URL ?? "").trim().replace(/\/$/, "");
-  return raw.startsWith("https://") ? raw : "https://mutolaa-tracker.vercel.app";
-}
+export { siteUrl as appUrl } from "@/lib/site";
 
 export function esc(text: string | null | undefined) {
   return (text ?? "").replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");

@@ -40,3 +40,28 @@ export async function updateProfile(_prev: ActionResult | null, formData: FormDa
   refresh();
   return { ok: true, message: uz.settings.saved };
 }
+
+const remindersSchema = z.object({
+  reminder_hour: z.string().refine((v) => v === "" || (/^\d{1,2}$/.test(v) && Number(v) <= 23)),
+  streak_alerts: z.literal("on").optional(),
+  weekly_digest: z.literal("on").optional(),
+});
+
+export async function updateReminders(_prev: ActionResult | null, formData: FormData): Promise<ActionResult> {
+  const user = await getSessionUser();
+  if (!user) return { ok: false, error: uz.common.error };
+  const parsed = remindersSchema.safeParse(Object.fromEntries(formData));
+  if (!parsed.success) return { ok: false, error: uz.common.error };
+  const supabase = await createServerSupabase();
+  const { error } = await supabase
+    .from("profiles")
+    .update({
+      reminder_hour: parsed.data.reminder_hour === "" ? null : Number(parsed.data.reminder_hour),
+      streak_alerts: parsed.data.streak_alerts === "on",
+      weekly_digest: parsed.data.weekly_digest === "on",
+    })
+    .eq("id", user.id);
+  if (error) return { ok: false, error: uz.common.error };
+  refresh();
+  return { ok: true, message: uz.reminders.saved };
+}

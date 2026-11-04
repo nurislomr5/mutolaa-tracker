@@ -8,3 +8,9 @@ export const site = {
     { name: "Asaxiy", url: "https://asaxiy.uz/product/knigi" },
   ],
 };
+
+// Saytning toʻliq manzili (SEO: sitemap, canonical, OG; bot havolalari). NEXT_PUBLIC_APP_URL https boʻlmasa — Vercel domeni.
+export function siteUrl() {
+  const raw = (process.env.NEXT_PUBLIC_APP_URL ?? "").trim().replace(/\/$/, "");
+  return raw.startsWith("https://") ? raw : "https://mutolaa-tracker.vercel.app";
+}
