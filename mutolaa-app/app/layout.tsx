@@ -1,8 +1,9 @@
-import type { Metadata } from "next";
+import type { Metadata, Viewport } from "next";
 import { Inter, Literata } from "next/font/google";
 import { SiteHeader } from "@/components/site-header";
 import { SiteFooter } from "@/components/site-footer";
 import { TelegramAutoLogin } from "@/components/telegram-auto-login";
+import { PwaSetup } from "@/components/pwa/pwa-setup";
 import { site, siteUrl } from "@/lib/site";
 import { themeInitScript } from "@/lib/theme";
 import "./globals.css";
@@ -28,9 +29,19 @@ export const metadata: Metadata = {
     template: `%s · ${site.name}`,
   },
   description: site.description,
+  // iOS: bosh ekranga qoʻshilganda nomi va toʻliq ekran rejimi (manifest esa app/manifest.ts da)
+  appleWebApp: { capable: true, title: site.name, statusBarStyle: "default" },
   verification: {
     google: "Ey6O6VliM0hSZIAOlHQXWo47gZb6F5wgS16eGcPjiXc",
   },
+};
+
+// Brauzer paneli va oʻrnatilgan ilova sarlavhasi rangi — sahifa foni bilan bir xil
+export const viewport: Viewport = {
+  themeColor: [
+    { media: "(prefers-color-scheme: light)", color: "#faf7f2" },
+    { media: "(prefers-color-scheme: dark)", color: "#14120f" },
+  ],
 };
 
 export default function RootLayout({ children }: LayoutProps<"/">) {
@@ -48,6 +59,7 @@ export default function RootLayout({ children }: LayoutProps<"/">) {
         <SiteHeader />
         <main className="flex-1">{children}</main>
         <SiteFooter />
+        <PwaSetup />
       </body>
     </html>
   );

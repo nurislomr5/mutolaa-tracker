@@ -35,6 +35,6 @@ export async function proxy(request: NextRequest) {
 }
 
 export const config = {
-  // statik fayllar, rasmlar va Telegram webhook'dan tashqari hamma sahifalar
-  matcher: ["/((?!_next/static|_next/image|favicon.ico|api/bot|api/cron|.*\\.(?:svg|png|jpg|jpeg|gif|webp|ico)$).*)"],
+  // statik fayllar, rasmlar, PWA fayllari va Telegram webhook'dan tashqari hamma sahifalar
+  matcher: ["/((?!_next/static|_next/image|favicon.ico|sw.js|manifest.webmanifest|api/bot|api/cron|.*\\.(?:svg|png|jpg|jpeg|gif|webp|ico)$).*)"],
 };

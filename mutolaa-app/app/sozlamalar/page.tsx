@@ -3,6 +3,7 @@ import { redirect } from "next/navigation";
 import { Suspense } from "react";
 import { signOut } from "@/app/kirish/actions";
 import { Button } from "@/components/ui/button";
+import { InstallAppCard } from "@/components/pwa/install-app";
 import { Card, CardTitle } from "@/components/ui/card";
 import { Container } from "@/components/ui/container";
 import { isTelegramEmail } from "@/lib/bot/login";
@@ -42,6 +43,12 @@ async function Settings() {
             <RemindersForm profile={profile} telegramLinked={telegramLinked} />
           </Card>
         )}
+        <Card>
+          <CardTitle>{uz.pwa.title}</CardTitle>
+          <div className="mt-2">
+            <InstallAppCard />
+          </div>
+        </Card>
         <Card>
           <CardTitle>{uz.auth.account}</CardTitle>
           <form action={signOut} className="mt-4">

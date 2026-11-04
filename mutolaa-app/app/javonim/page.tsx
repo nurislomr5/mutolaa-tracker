@@ -2,6 +2,7 @@ import type { Metadata } from "next";
 import Link from "next/link";
 import { Suspense } from "react";
 import { BookCover } from "@/components/book/book-cover";
+import { InstallBanner } from "@/components/pwa/install-app";
 import { DeleteShelfButton } from "@/components/shelf/delete-shelf-button";
 import { ProgressForm } from "@/components/shelf/progress-form";
 import { buttonClasses } from "@/components/ui/button";
@@ -131,6 +132,7 @@ export default function ShelfPage(props: PageProps<"/javonim">) {
   return (
     <Container className="py-8 sm:py-10">
       <h1 className="mb-6 font-serif text-3xl font-semibold">{uz.shelf.title}</h1>
+      <InstallBanner />
       <Suspense fallback={<div className="h-64 animate-pulse rounded-2xl bg-surface-2" />}>
         <ShelfView searchParams={props.searchParams} />
       </Suspense>

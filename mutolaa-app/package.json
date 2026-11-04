@@ -11,7 +11,8 @@
     "bot:setup": "tsx scripts/telegram-webhook.ts",
     "import:asaxiy": "tsx scripts/import-asaxiy.ts",
     "publishers:merge": "tsx scripts/merge-publishers.ts",
-    "storage:setup": "tsx scripts/setup-storage.ts"
+    "storage:setup": "tsx scripts/setup-storage.ts",
+    "icons": "tsx scripts/generate-icons.ts"
   },
   "dependencies": {
     "@google/genai": "^2.31.0",
