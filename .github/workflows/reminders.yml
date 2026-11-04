@@ -1,6 +1,7 @@
 # Telegram eslatmalari: har soatda saytning /api/cron/reminders yoʻlini chaqiradi.
 # (Vercel bepul tarifida cron kuniga bir marta bilan cheklangan.)
 # Repo Settings → Secrets and variables → Actions ga qoʻshing: CRON_SECRET (Vercel'dagi bilan bir xil).
+# Ogohlantirish (ixtiyoriy): TELEGRAM_BOT_TOKEN, ALERT_TELEGRAM_CHAT_ID — yiqilsa Telegram'ga xabar.
 name: Telegram eslatmalari
 
 on:
@@ -15,8 +16,20 @@ jobs:
     steps:
       - name: Eslatmalarni yuborish
         run: |
+          # pipefail'siz "| head" curl xatosini yashiradi va yiqilgan soʻrov ham "muvaffaqiyatli" koʻrinadi
+          set -o pipefail
           curl --fail-with-body -sS -X POST \
             -H "Authorization: Bearer $CRON_SECRET" \
             "https://mutolaa-tracker.vercel.app/api/cron/reminders" | head -c 2000
         env:
           CRON_SECRET: ${{ secrets.CRON_SECRET }}
+      - name: Telegram ogohlantirish
+        if: failure()
+        run: |
+          [ -n "$ALERT_TELEGRAM_CHAT_ID" ] && [ -n "$TELEGRAM_BOT_TOKEN" ] || exit 0
+          curl -sS -o /dev/null -X POST "https://api.telegram.org/bot$TELEGRAM_BOT_TOKEN/sendMessage" \
+            --data-urlencode "chat_id=$ALERT_TELEGRAM_CHAT_ID" \
+            --data-urlencode "text=⚠️ $GITHUB_WORKFLOW yiqildi: $GITHUB_SERVER_URL/$GITHUB_REPOSITORY/actions/runs/$GITHUB_RUN_ID"
+        env:
+          TELEGRAM_BOT_TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN }}
+          ALERT_TELEGRAM_CHAT_ID: ${{ secrets.ALERT_TELEGRAM_CHAT_ID }}

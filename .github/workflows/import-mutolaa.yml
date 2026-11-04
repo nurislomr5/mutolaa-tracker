@@ -1,6 +1,7 @@
 # Katalogni har hafta yangilaydi: Mutolaa (audio/e-kitob) va Asaxiy (qogʻoz kitoblar, narx, mavjudlik).
 # Repo Settings → Secrets and variables → Actions ga qo'shing:
 #   NEXT_PUBLIC_SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY
+# Ogohlantirish (ixtiyoriy): TELEGRAM_BOT_TOKEN, ALERT_TELEGRAM_CHAT_ID — yiqilsa Telegram'ga xabar.
 name: Katalog importi
 
 on:
@@ -42,3 +43,13 @@ jobs:
           IMPORT_ARGS: ${{ inputs.args }}
           NEXT_PUBLIC_SUPABASE_URL: ${{ secrets.NEXT_PUBLIC_SUPABASE_URL }}
           SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
+      - name: Telegram ogohlantirish
+        if: failure()
+        run: |
+          [ -n "$ALERT_TELEGRAM_CHAT_ID" ] && [ -n "$TELEGRAM_BOT_TOKEN" ] || exit 0
+          curl -sS -o /dev/null -X POST "https://api.telegram.org/bot$TELEGRAM_BOT_TOKEN/sendMessage" \
+            --data-urlencode "chat_id=$ALERT_TELEGRAM_CHAT_ID" \
+            --data-urlencode "text=⚠️ $GITHUB_WORKFLOW yiqildi: $GITHUB_SERVER_URL/$GITHUB_REPOSITORY/actions/runs/$GITHUB_RUN_ID"
+        env:
+          TELEGRAM_BOT_TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN }}
+          ALERT_TELEGRAM_CHAT_ID: ${{ secrets.ALERT_TELEGRAM_CHAT_ID }}

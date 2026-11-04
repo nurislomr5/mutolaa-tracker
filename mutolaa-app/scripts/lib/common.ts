@@ -89,3 +89,16 @@ export async function runPool<T>(items: T[], concurrency: number, delayMs: numbe
   }
   await Promise.all(Array.from({ length: concurrency }, worker));
 }
+
+// Manba sayt tuzilmasi oʻzgarsa importer jim "muvaffaqiyatli" tugamasin: exit 1 -> GitHub Actions yiqiladi va Telegram'ga ogohlantirish ketadi
+export function checkHealth(source: string, s: { listed: number; attempted: number; ok: number; failed: number }) {
+  const problems: string[] = [];
+  if (s.listed === 0) problems.push("kitoblar roʻyxati boʻsh — sitemap yoki katalog tuzilmasi oʻzgargan boʻlishi mumkin");
+  if (s.attempted >= 20 && s.failed / s.attempted > 0.3) problems.push(`${s.failed}/${s.attempted} ta sahifa oʻqilmadi yoki saqlanmadi`);
+  if (s.attempted >= 20 && s.ok === 0) problems.push("birorta ham kitob olinmadi — sahifa tuzilmasi oʻzgargan boʻlishi mumkin");
+  if (s.attempted > 0 && s.attempted < 20 && s.failed > 0 && s.ok === 0) problems.push("hamma urinish muvaffaqiyatsiz");
+  if (problems.length) {
+    console.error(`✗ ${source}: ${problems.join("; ")}`);
+    process.exitCode = 1;
+  }
+}

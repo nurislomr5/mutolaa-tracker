@@ -7,6 +7,8 @@
     "build": "next build",
     "start": "next start",
     "lint": "eslint",
+    "test": "vitest run",
+    "typecheck": "next typegen && tsc --noEmit",
     "import:mutolaa": "tsx scripts/import-mutolaa.ts",
     "bot:setup": "tsx scripts/telegram-webhook.ts",
     "import:asaxiy": "tsx scripts/import-asaxiy.ts",
@@ -35,6 +37,7 @@
     "eslint-config-next": "16.4.2",
     "tailwindcss": "^4",
     "tsx": "^4.23.15",
-    "typescript": "^5"
+    "typescript": "^5",
+    "vitest": "^3.2.7"
   }
 }

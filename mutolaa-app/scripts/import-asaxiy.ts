@@ -12,7 +12,7 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
 import { PUBLISHER_NAMES, publisherSlug } from "../lib/publishers";
 import { slugify, uzNormalize } from "../lib/text/normalize";
-import { cliArgs, createAdmin, decodeHtml, fetchText, jsonLdNodes, loadEnv, runPool } from "./lib/common";
+import { checkHealth, cliArgs, createAdmin, decodeHtml, fetchText, jsonLdNodes, loadEnv, runPool } from "./lib/common";
 
 loadEnv();
 
@@ -369,6 +369,7 @@ async function freshSlugs(db: SupabaseClient) {
 async function main() {
   const db = DRY_RUN ? null : createAdmin();
   let slugs = await collectSlugs();
+  const listed = slugs.length;
   console.log(`Asaxiy: ${slugs.length} ta mahsulot`);
   if (db && !FORCE && !ONLY_SLUG) {
     const fresh = await freshSlugs(db);
@@ -419,7 +420,7 @@ async function main() {
       (saver ? ` (${saver.stats.matched} ta mavjud asarga qoʻshildi, ${saver.stats.created} ta yangi)` : "") +
       `, ${skipped} ta kitob emas, ${failed} ta xato, ${Math.round((Date.now() - startedAt) / 1000)} s`,
   );
-  if (failed > 0 && ok === 0) process.exitCode = 1;
+  checkHealth("Asaxiy", { listed, attempted: slugs.length, ok, failed });
 }
 
 main().catch((err) => {

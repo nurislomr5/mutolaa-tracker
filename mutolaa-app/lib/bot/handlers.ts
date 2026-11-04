@@ -336,6 +336,12 @@ export async function handleUpdate(update: TgUpdate): Promise<string> {
   const start = text.match(/^\/start(?:@\w+)?(?:\s+([A-Za-z0-9_-]{16,64}))?$/);
   if (start?.[1]) return linkAccount(db, chatId, msg.from, start[1]);
 
+  // /id — chat ID (ALERT_TELEGRAM_CHAT_ID / MY_TELEGRAM_ID sozlash uchun; menyuda koʻrsatilmaydi)
+  if (/^\/id(?:@\w+)?$/.test(text)) {
+    await sendMessage(chatId, `🆔 <code>${chatId}</code>`);
+    return "chat_id";
+  }
+
   const profile = await profileByTelegram(db, msg.from.id);
   if (!profile) {
     await sendMessage(chatId, t.notLinked, [[{ text: t.openSettings, url: `${appUrl()}/sozlamalar` }]]);

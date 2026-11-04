@@ -12,7 +12,7 @@
  */
 import { createClient, type SupabaseClient } from "@supabase/supabase-js";
 import { slugify } from "../lib/text/normalize";
-import { loadEnv } from "./lib/common";
+import { checkHealth, loadEnv } from "./lib/common";
 
 loadEnv();
 
@@ -456,6 +456,7 @@ async function main() {
   if (db) console.log(`Baza: ${new URL(url!).host}`);
 
   let slugs = await loadSlugs();
+  const listed = slugs.length;
   console.log(`Sitemap: ${slugs.length} ta kitob`);
   if (db && !FORCE && !ONLY_SLUG) {
     const fresh = await freshSlugs(db);
@@ -516,7 +517,7 @@ async function main() {
   if (db) await flush(db, caches!, pending);
 
   console.log(`Tayyor: ${ok} ta ${DRY_RUN ? "oʻqildi" : "saqlandi"}, ${failed} ta xato, ${Math.round((Date.now() - startedAt) / 1000)} s`);
-  if (failed > 0 && ok === 0) process.exitCode = 1;
+  checkHealth("Mutolaa", { listed, attempted: slugs.length, ok, failed });
 }
 
 main().catch((err) => {

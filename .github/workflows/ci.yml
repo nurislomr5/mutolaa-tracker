@@ -1,0 +1,44 @@
+# Har push va PR'da: lint, tiplar, unit testlar. Yiqilsa — Telegram'ga ogohlantirish.
+# Ogohlantirish uchun secrets (ixtiyoriy): TELEGRAM_BOT_TOKEN, ALERT_TELEGRAM_CHAT_ID
+name: CI
+
+on:
+  push:
+    branches: [main]
+    paths: ["mutolaa-app/**", ".github/workflows/ci.yml"]
+  pull_request:
+    paths: ["mutolaa-app/**", ".github/workflows/ci.yml"]
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  check:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    defaults:
+      run:
+        working-directory: mutolaa-app
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: npm
+          cache-dependency-path: mutolaa-app/package-lock.json
+      - run: npm ci
+      - run: npm run lint
+      - run: npm run typecheck
+      - run: npm test
+      - name: Telegram ogohlantirish
+        if: failure() && github.event_name == 'push'
+        working-directory: .
+        run: |
+          [ -n "$ALERT_TELEGRAM_CHAT_ID" ] && [ -n "$TELEGRAM_BOT_TOKEN" ] || exit 0
+          curl -sS -o /dev/null -X POST "https://api.telegram.org/bot$TELEGRAM_BOT_TOKEN/sendMessage" \
+            --data-urlencode "chat_id=$ALERT_TELEGRAM_CHAT_ID" \
+            --data-urlencode "text=⚠️ CI yiqildi ($GITHUB_SHA): $GITHUB_SERVER_URL/$GITHUB_REPOSITORY/actions/runs/$GITHUB_RUN_ID"
+        env:
+          TELEGRAM_BOT_TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN }}
+          ALERT_TELEGRAM_CHAT_ID: ${{ secrets.ALERT_TELEGRAM_CHAT_ID }}
