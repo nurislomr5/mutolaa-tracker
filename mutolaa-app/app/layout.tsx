@@ -27,6 +27,9 @@ export const metadata: Metadata = {
     template: `%s · ${site.name}`,
   },
   description: site.description,
+  verification: {
+    google: "Ey6O6VliM0hSZIAOlHQXWo47gZb6F5wgS16eGcPjiXc",
+  },
 };
 
 export default function RootLayout({ children }: LayoutProps<"/">) {
