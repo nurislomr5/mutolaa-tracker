@@ -1,5 +1,5 @@
 /**
- * Telegram bot sozlamalari: webhook manzili (secret bilan) va buyruqlar menyusi.
+ * Telegram bot sozlamalari: webhook manzili (secret bilan), buyruqlar menyusi va Mini App menyu tugmasi.
  *
  *   npm run bot:setup            # webhook -> <NEXT_PUBLIC_APP_URL>/api/bot, buyruqlar menyusi
  *   npm run bot:setup -- --info  # hozirgi webhook holatini koʻrsatish
@@ -57,6 +57,12 @@ async function main() {
     ],
   });
   console.log("setMyCommands:", commands.ok ? "✓" : commands.description);
+
+  // Yozish maydoni yonidagi "📚 Sahifa" tugmasi — saytni Mini App sifatida ochadi (avtomatik kirish bilan)
+  const menu = await call("setChatMenuButton", {
+    menu_button: { type: "web_app", text: "📚 Sahifa", web_app: { url: `${appUrl}/javonim` } },
+  });
+  console.log("setChatMenuButton:", menu.ok ? "✓" : menu.description);
 }
 
 main().catch((err) => {

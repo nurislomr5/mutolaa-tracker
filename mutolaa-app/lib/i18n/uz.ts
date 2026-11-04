@@ -255,6 +255,7 @@ export const uz = {
     google: "Google orqali kirish",
     telegram: "Telegram orqali kirish",
     telegramHint: "Bot ochiladi — «Start» bosing, kirish tugmasini olasiz",
+    telegramSigningIn: "Telegram orqali kirilmoqda…",
     invalidEmail: "Email manzili notoʻgʻri.",
     invalidCode: "Kod notoʻgʻri yoki muddati oʻtgan.",
     rateLimit: "Juda koʻp urinish. Bir necha daqiqadan soʻng qayta urinib koʻring.",

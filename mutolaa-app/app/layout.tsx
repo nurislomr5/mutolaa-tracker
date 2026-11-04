@@ -2,6 +2,7 @@ import type { Metadata } from "next";
 import { Inter, Literata } from "next/font/google";
 import { SiteHeader } from "@/components/site-header";
 import { SiteFooter } from "@/components/site-footer";
+import { TelegramAutoLogin } from "@/components/telegram-auto-login";
 import { site, siteUrl } from "@/lib/site";
 import { themeInitScript } from "@/lib/theme";
 import "./globals.css";
@@ -43,6 +44,7 @@ export default function RootLayout({ children }: LayoutProps<"/">) {
         <script dangerouslySetInnerHTML={{ __html: themeInitScript }} />
       </head>
       <body className="flex min-h-full flex-col font-sans">
+        <TelegramAutoLogin />
         <SiteHeader />
         <main className="flex-1">{children}</main>
         <SiteFooter />
