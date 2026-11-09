@@ -505,3 +505,95 @@ describe("20261110000012: taqrizlarga 'Foydali' ovozi", () => {
     expect(await counts(target)).toEqual([{ user_book_id: kept, helpful: 1 }]);
   });
 });
+
+describe("20261111000013: kitobxonlik klublari", () => {
+  const q1 = async <T = Record<string, unknown>>(sql: string, params: unknown[] = []) => (await db.query<T>(sql, params)).rows;
+  const C = "00000000-0000-0000-0000-00000000000c"; // oldingi blokda yaratilgan
+  const rpc = async (role: Role, sub: string | null, sql: string, params: unknown[] = []) => (await as(role, sub, sql, params)).rows;
+  let openSlug: string, privSlug: string, openId: number, privId: number, book: number;
+
+  beforeAll(async () => {
+    [{ id: book }] = await q1<{ id: number }>(`insert into public.books (slug, title, source) values ('klub-kitobi', 'Klub kitobi', 'mutolaa') returning id`);
+    openSlug = (await rpc("authenticated", A, `select public.create_club('Kitob sevarlar', 'Har oy bitta kitob', true) as s`))[0].s as string;
+    privSlug = (await rpc("authenticated", A, `select public.create_club('Kitob sevarlar', null, false) as s`))[0].s as string;
+    [{ id: openId }] = await q1<{ id: number }>(`select id from public.clubs where slug = $1`, [openSlug]);
+    [{ id: privId }] = await q1<{ id: number }>(`select id from public.clubs where slug = $1`, [privSlug]);
+  });
+
+  it("ochadi: slug nomdan, takrorlansa raqam bilan; yaratuvchi — boshqaruvchi; kuniga 3 tadan koʻp emas", async () => {
+    expect(openSlug).toBe("kitob-sevarlar");
+    expect(privSlug).toBe("kitob-sevarlar-2");
+    expect(await q1(`select role from public.club_members where club_id = $1`, [openId])).toEqual([{ role: "owner" }]);
+    await rpc("authenticated", A, `select public.create_club('Uchinchi klub', null, true)`);
+    await expect(as("authenticated", A, `select public.create_club('Toʻrtinchi klub', null, true)`)).rejects.toThrow(/kunlik cheklov/);
+    await expectDenied("anon", null, `select public.create_club('Mehmon klubi', null, true)`);
+    await expectDenied("authenticated", A, `insert into public.clubs (slug, name, owner_id) values ('x', 'Xxx', $1)`, [A]);
+  });
+
+  it("ochiq klub hammaga koʻrinadi, yopigʻi — faqat aʼzolarga; taklif kodi faqat egasiga", async () => {
+    expect((await rpc("anon", null, `select name, is_owner, invite_code from public.club_page($1)`, [openSlug]))[0]).toEqual({ name: "Kitob sevarlar", is_owner: false, invite_code: null });
+    expect(await rpc("anon", null, `select id from public.club_page($1)`, [privSlug])).toEqual([]);
+    expect(await rpc("authenticated", B, `select id from public.clubs where id = $1`, [privId])).toEqual([]);
+    const dir = (await rpc("anon", null, `select slug from public.club_directory(false, 50)`)).map((r) => r.slug);
+    expect(dir).toContain(openSlug);
+    expect(dir).not.toContain(privSlug);
+    await expectDenied("anon", null, `select invite_code from public.clubs`);
+    const owner = (await rpc("authenticated", A, `select is_owner, invite_code from public.club_page($1)`, [privSlug]))[0];
+    expect(owner.is_owner).toBe(true);
+    expect(String(owner.invite_code)).toMatch(/^[0-9a-f]{32}$/);
+  });
+
+  it("qoʻshilish: ochiq klubga toʻgʻridan-toʻgʻri, yopiqqa faqat taklif kodi bilan", async () => {
+    await as("authenticated", B, `insert into public.club_members (club_id) values ($1)`, [openId]);
+    await expectDenied("authenticated", B, `insert into public.club_members (club_id) values ($1)`, [privId]);
+    await expectDenied("authenticated", B, `insert into public.club_members (club_id, role) values ($1, 'owner')`, [openId]);
+    const [{ invite_code: code }] = await q1<{ invite_code: string }>(`select invite_code from public.clubs where id = $1`, [privId]);
+    expect((await rpc("authenticated", C, `select * from public.club_by_invite($1)`, [code]))[0]).toMatchObject({ name: "Kitob sevarlar", member_count: 1, is_member: false });
+    expect((await rpc("authenticated", C, `select public.join_club_by_code($1) as s`, [code]))[0].s).toBe(privSlug);
+    expect((await rpc("authenticated", C, `select is_member from public.club_page($1)`, [privSlug]))[0].is_member).toBe(true);
+    expect((await rpc("authenticated", C, `select public.join_club_by_code('notogri') as s`))[0].s).toBeNull();
+    // kod yangilansa eski havola ishlamaydi
+    await rpc("authenticated", A, `select public.reset_club_invite($1)`, [privId]);
+    expect((await rpc("authenticated", B, `select public.join_club_by_code($1) as s`, [code]))[0].s).toBeNull();
+  });
+
+  it("muhokama: faqat aʼzo yozadi, javob bir darajali; muallif yoki egasi oʻchiradi", async () => {
+    const [{ id: post }] = await rpc("authenticated", B, `insert into public.club_posts (club_id, body) values ($1, 'Birinchi bob ajoyib') returning id`, [openId]) as { id: number }[];
+    const [{ id: reply }] = await rpc("authenticated", A, `insert into public.club_posts (club_id, parent_id, body) values ($1, $2, 'Qoʻshilaman') returning id`, [openId, post]) as { id: number }[];
+    await expectDenied("authenticated", C, `insert into public.club_posts (club_id, body) values ($1, 'Aʼzo emasman')`, [openId]);
+    await expectDenied("authenticated", A, `insert into public.club_posts (club_id, parent_id, body) values ($1, $2, 'Javobga javob')`, [openId, reply]);
+    await expectDenied("authenticated", B, `insert into public.club_posts (club_id, user_id, body) values ($1, $2, 'Boshqa nomidan')`, [openId, A]);
+
+    const feed = await rpc("anon", null, `select id, parent_id, body, display_name, username, can_delete from public.club_feed($1, 50)`, [openId]);
+    expect(feed).toEqual([
+      { id: post, parent_id: null, body: "Birinchi bob ajoyib", display_name: "Kitobxon", username: null, can_delete: false },
+      { id: reply, parent_id: post, body: "Qoʻshilaman", display_name: "Ali V", username: "ali_v", can_delete: false },
+    ]);
+    expect(await rpc("anon", null, `select id from public.club_feed($1, 50)`, [privId])).toEqual([]);
+    expect((await rpc("authenticated", C, `delete from public.club_posts where id = $1 returning 1`, [post]))).toHaveLength(0);
+    expect((await rpc("authenticated", A, `delete from public.club_posts where id = $1 returning 1`, [post]))).toHaveLength(1);
+    expect(await q1(`select id from public.club_posts where id in ($1, $2)`, [post, reply])).toEqual([]); // javob ham
+  });
+
+  it("joriy kitob va aʼzolar progressi; egasi chiqib keta olmaydi, aʼzoni chiqara oladi", async () => {
+    expect(await rpc("authenticated", B, `update public.clubs set name = 'Buzilgan' where id = $1 returning 1`, [openId])).toHaveLength(0);
+    expect(await rpc("authenticated", B, `update public.clubs set current_book_id = $2 where id = $1 returning 1`, [openId, book])).toHaveLength(0);
+    await rpc("authenticated", A, `update public.clubs set current_book_id = $2 where id = $1`, [openId, book]);
+    await q1(`insert into public.user_books (user_id, book_id, status, unit, current_value, total_value) values ($1, $2, 'reading', 'pages', 50, 200)`, [B, book]);
+    const members = await rpc("anon", null, `select role, status, current_value, total_value from public.club_members_view($1)`, [openId]);
+    expect(members).toEqual([
+      { role: "owner", status: null, current_value: null, total_value: null },
+      { role: "member", status: "reading", current_value: 50, total_value: 200 },
+    ]);
+    expect(await rpc("anon", null, `select user_id from public.club_members_view($1)`, [privId])).toEqual([]);
+
+    expect(await rpc("authenticated", A, `delete from public.club_members where club_id = $1 and user_id = $2 returning 1`, [openId, A])).toHaveLength(0);
+    expect(await rpc("authenticated", A, `delete from public.club_members where club_id = $1 and user_id = $2 returning 1`, [openId, B])).toHaveLength(1);
+  });
+
+  it("joriy kitob takror sifatida birlashtirilsa klub asosiy kitobga oʻtadi", async () => {
+    const [{ id: main }] = await q1<{ id: number }>(`insert into public.books (slug, title, source) values ('klub-asosiy', 'Klub kitobi', 'mutolaa') returning id`);
+    await as("service_role", null, `select public.merge_books($1, $2)`, [main, book]);
+    expect(await q1(`select current_book_id from public.clubs where id = $1`, [openId])).toEqual([{ current_book_id: main }]);
+  });
+});

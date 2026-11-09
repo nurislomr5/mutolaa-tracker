@@ -12,6 +12,7 @@ const links = [
   { href: "/kitoblar", label: uz.nav.catalog },
   { href: "/javonim", label: uz.nav.shelves },
   { href: "/lenta", label: uz.nav.feed },
+  { href: "/klublar", label: uz.clubs.nav },
   { href: "/qaydlar", label: uz.nav.notes },
   { href: "/statistika", label: uz.nav.stats },
   { href: "/skaner", label: uz.scanner.nav },
