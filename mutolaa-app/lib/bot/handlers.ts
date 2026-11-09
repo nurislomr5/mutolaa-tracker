@@ -8,6 +8,9 @@ import { addDays, computeStreaks, dayKey } from "@/lib/stats-utils";
 import { todayInTashkent, type ProgressUnit, type ReadingFormat, type ShelfStatus } from "@/lib/shelf-types";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { createLoginLink } from "@/lib/bot/login";
+import { readIsbnFromImage } from "@/lib/bot/barcode";
+import { fetchExternalIsbnMeta, isbnVariants } from "@/lib/isbn";
+import { findBookByIsbn } from "@/lib/isbn-lookup";
 
 // Telegram webhook mantiqi. Bot service role bilan ishlaydi — har bir soʻrov profil user_id si bilan cheklanadi.
 
@@ -19,6 +22,9 @@ type TgMessage = {
   text?: string;
   voice?: { file_id: string; mime_type?: string; duration?: number };
   audio?: { file_id: string; mime_type?: string };
+  // Telegram bir nechta oʻlchamni yuboradi (oxirgisi — eng kattasi); "fayl sifatida" yuborilgan rasm — document
+  photo?: { file_id: string; file_size?: number; width: number; height: number }[];
+  document?: { file_id: string; mime_type?: string; file_size?: number };
 };
 export type TgUpdate = {
   update_id: number;
@@ -168,6 +174,61 @@ async function sendSearch(db: SupabaseClient, chatId: number, query: string) {
   ]);
   await sendMessage(chatId, `<b>${t.searchTitle}</b>\n\n${text}`, keyboard);
   return "search_sent";
+}
+
+// ISBN (rasmdan oʻqilgan yoki /isbn bilan yozilgan) → katalogdagi kitob va javonga qoʻshish tugmalari
+async function sendIsbnResult(db: SupabaseClient, chatId: number, userId: string, raw: string) {
+  const found = await findBookByIsbn(db, raw);
+  if (!found) {
+    await sendMessage(chatId, t.isbnInvalid(esc(raw.slice(0, 32))));
+    return "isbn_invalid";
+  }
+  const { isbn, book } = found;
+  const base = appUrl();
+
+  if (!book) {
+    const external = await fetchExternalIsbnMeta(isbn);
+    const params = new URLSearchParams({ isbn });
+    if (external?.title) params.set("nom", external.title);
+    const lines = [t.isbnNotFound(isbn)];
+    if (external?.title) lines.push(t.isbnExternal(`<b>${esc(external.title)}</b>${external.authors ? ` — ${esc(external.authors)}` : ""}`));
+    await sendMessage(chatId, lines.join("\n"), [[{ text: t.isbnAdd, url: `${base}/kitob-qoshish?${params}` }]]);
+    return "isbn_not_found";
+  }
+
+  const { data: mine } = await db.from("user_books").select("status").eq("user_id", userId).eq("book_id", book.id).maybeSingle();
+  const lines = [t.isbnFound(isbn), "", `📖 <b>${esc(book.title)}</b>`];
+  if (book.author_names) lines.push(`✍️ ${esc(book.author_names)}`);
+  if (mine?.status) lines.push("", t.isbnOnShelf(uz.status[mine.status as ShelfStatus]));
+  await sendMessage(chatId, lines.join("\n"), [
+    [
+      { text: t.btnReading, callback_data: `st:${book.id}:reading` },
+      { text: t.btnWant, callback_data: `st:${book.id}:want` },
+    ],
+    [{ text: t.isbnOpen, url: `${base}/kitob/${book.slug}` }],
+  ]);
+  return "isbn_found";
+}
+
+async function handlePhoto(db: SupabaseClient, chatId: number, userId: string, fileId: string) {
+  const bytes = await downloadFile(fileId);
+  if (!bytes) {
+    await sendMessage(chatId, t.error);
+    return "photo_download_failed";
+  }
+  let isbn: string | null;
+  try {
+    isbn = await readIsbnFromImage(bytes);
+  } catch (err) {
+    console.error("[bot] shtrix-kod:", err);
+    await sendMessage(chatId, t.error);
+    return "photo_decode_error";
+  }
+  if (!isbn) {
+    await sendMessage(chatId, t.photoNoBarcode);
+    return "photo_no_barcode";
+  }
+  return sendIsbnResult(db, chatId, userId, isbn);
 }
 
 async function sendRecommendations(db: SupabaseClient, chatId: number, userId: string) {
@@ -440,6 +501,13 @@ export async function handleUpdate(update: TgUpdate): Promise<string> {
     if (name === "status") return sendStatus(db, chatId, profile.id);
     if (name === "savollar") return sendQuestions(db, chatId, profile.id);
     if (name === "qidir") return sendSearch(db, chatId, arg);
+    if (name === "isbn") {
+      if (!arg.trim()) {
+        await sendMessage(chatId, t.isbnHint);
+        return "isbn_hint";
+      }
+      return sendIsbnResult(db, chatId, profile.id, arg.trim());
+    }
     if (name === "tavsiya") return sendRecommendations(db, chatId, profile.id);
     if (name === "statistika") return sendStats(db, chatId, profile);
     if (name === "eslatma") {
@@ -457,6 +525,23 @@ export async function handleUpdate(update: TgUpdate): Promise<string> {
     await sendMessage(chatId, t.help);
     return "unknown_command";
   }
+
+  // Shtrix-kod rasmi: oddiy foto yoki "fayl sifatida" yuborilgan rasm (siqilmagan — oʻqish osonroq)
+  const image = msg.photo?.at(-1) ?? (msg.document?.mime_type?.startsWith("image/") ? msg.document : undefined);
+  if (image) {
+    if (!allowBotRate(`photo:${msg.from.id}`, 10)) {
+      await sendMessage(chatId, uz.auth.rateLimit);
+      return "rate_limited";
+    }
+    if ((image.file_size ?? 0) > 10_000_000) {
+      await sendMessage(chatId, t.photoTooLarge);
+      return "photo_too_large";
+    }
+    return handlePhoto(db, chatId, profile.id, image.file_id);
+  }
+
+  // Faqat ISBN raqamining oʻzi yozilgan boʻlsa — AI'siz toʻgʻridan-toʻgʻri qidiramiz
+  if (/^[\d\s-]{9,20}[\dXx]$/.test(text) && isbnVariants(text)) return sendIsbnResult(db, chatId, profile.id, text);
 
   const voice = msg.voice ?? msg.audio;
   if (!voice && !text) return "unsupported";

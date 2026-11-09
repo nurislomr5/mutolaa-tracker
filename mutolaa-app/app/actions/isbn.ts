@@ -1,6 +1,7 @@
 "use server";
 
-import { fetchExternalIsbnMeta, isbnVariants, type ExternalIsbnBook } from "@/lib/isbn";
+import { fetchExternalIsbnMeta, type ExternalIsbnBook } from "@/lib/isbn";
+import { findBookByIsbn } from "@/lib/isbn-lookup";
 import type { ShelfStatus } from "@/lib/shelf-types";
 import { createPublicClient } from "@/lib/supabase/public";
 import { createServerSupabase, getSessionUser } from "@/lib/supabase/server";
@@ -20,22 +21,11 @@ export type IsbnResult =
   | { kind: "not_found"; isbn: string; external?: ExternalIsbnBook | null }
   | { kind: "invalid" };
 
-const CARD = "id, slug, title, author_names, cover_url, page_count";
-
-// Skaner yoki qoʻlda kiritilgan ISBN boʻyicha kitob: avval doʻkon nashrlari (book_sources), soʻng kitoblarning oʻzi
+// Skaner yoki qoʻlda kiritilgan ISBN boʻyicha kitob (qidiruv — lib/isbn-lookup.ts) + foydalanuvchi javonidagi holati
 export async function lookupIsbn(raw: string): Promise<IsbnResult> {
-  const variants = isbnVariants(String(raw ?? "").slice(0, 32));
-  if (!variants) return { kind: "invalid" };
-  const isbn = variants[0];
-  const db = createPublicClient();
-
-  let book: Omit<IsbnBook, "status"> | null = null;
-  const { data: edition } = await db.from("book_sources").select(`books!inner(${CARD})`).in("isbn_digits", variants).limit(1).maybeSingle();
-  if (edition) book = (edition as unknown as { books: Omit<IsbnBook, "status"> }).books;
-  if (!book) {
-    const { data } = await db.from("books").select(CARD).in("isbn_digits", variants).limit(1).maybeSingle();
-    book = (data as Omit<IsbnBook, "status"> | null) ?? null;
-  }
+  const found = await findBookByIsbn(createPublicClient(), raw);
+  if (!found) return { kind: "invalid" };
+  const { isbn, book } = found;
   if (!book) {
     const external = await fetchExternalIsbnMeta(isbn);
     return { kind: "not_found", isbn, external };

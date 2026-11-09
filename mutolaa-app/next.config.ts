@@ -20,6 +20,12 @@ const nextConfig: NextConfig = {
       },
     ];
   },
+  // Telegram bot rasmdagi shtrix-kodni serverda oʻqiydi (lib/bot/barcode.ts): paket bundle qilinmaydi,
+  // .wasm fayl esa funksiya bilan birga yuklanadi
+  serverExternalPackages: ["zxing-wasm"],
+  outputFileTracingIncludes: {
+    "/api/bot": ["./node_modules/zxing-wasm/dist/reader/zxing_reader.wasm"],
+  },
   cacheComponents: true,
   partialPrefetching: true,
   images: {
