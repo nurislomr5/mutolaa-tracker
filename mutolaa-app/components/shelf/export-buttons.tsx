@@ -3,7 +3,6 @@
 import { Button } from "@/components/ui/button";
 import { uz } from "@/lib/i18n/uz";
 import type { NoteWithBook, ShelfItem } from "@/lib/shelf";
-import { parseReviewSpoiler, splitNoteAnswer } from "@/lib/shelf-types";
 
 function downloadTextFile(filename: string, content: string, mime: string) {
   const blob = new Blob(["\uFEFF" + content], { type: `${mime};charset=utf-8` });
@@ -31,7 +30,7 @@ export function ExportNotesButton({ notes }: { notes: NoteWithBook[] }) {
     for (const [bookTitle, items] of byBook) {
       lines.push(`## ${bookTitle}`, "");
       for (const n of items) {
-        const { body, answer } = splitNoteAnswer(n.content);
+        const { content: body, answer } = n;
         const ref = n.reference_point ? ` (${n.reference_point})` : "";
         const date = n.created_at.slice(0, 10);
         lines.push(`- **[${uz.noteType[n.type]}]**${ref} _${date}_`);
@@ -63,7 +62,7 @@ export function ExportShelfCsvButton({ items }: { items: ShelfItem[] }) {
   if (items.length === 0) return null;
 
   function handleExport() {
-    const header = ["title", "authors", "status", "format", "current", "total", "unit", "rating", "started_at", "finished_at", "review"];
+    const header = ["title", "authors", "status", "format", "current", "total", "unit", "rating", "started_at", "finished_at", "review", "review_is_spoiler"];
     const rows = items.map((i) => [
       csvCell(i.book.title),
       csvCell(i.book.author_names),
@@ -75,7 +74,8 @@ export function ExportShelfCsvButton({ items }: { items: ShelfItem[] }) {
       csvCell(i.rating),
       csvCell(i.started_at?.slice(0, 10)),
       csvCell(i.finished_at?.slice(0, 10)),
-      csvCell(parseReviewSpoiler(i.review).text),
+      csvCell(i.review),
+      csvCell(i.review ? (i.review_is_spoiler ? "ha" : "yoʻq") : ""),
     ]);
     const csv = [header.join(","), ...rows.map((r) => r.join(","))].join("\r\n");
     downloadTextFile("sahifa-javonim.csv", csv, "text/csv");

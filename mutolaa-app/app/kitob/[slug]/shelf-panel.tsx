@@ -92,7 +92,7 @@ export async function MyBookSection({ book }: { book: BookDetail }) {
         <div>
           <CardTitle>{t.review}</CardTitle>
           <div className="mt-3">
-            <ReviewForm userBookId={userBook.id} review={userBook.review} />
+            <ReviewForm userBookId={userBook.id} review={userBook.review} isSpoiler={userBook.review_is_spoiler} />
           </div>
         </div>
       </Card>

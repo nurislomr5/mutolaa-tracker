@@ -92,7 +92,7 @@ async function ProfileView({ params }: { params: PageProps<"/u/[username]">["par
                   </Link>
                   {r.rating && <span className="shrink-0 text-sm text-warning">★ {Number(r.rating).toFixed(1)}</span>}
                 </div>
-                <ReviewText review={r.review} className="mt-2 line-clamp-6 whitespace-pre-line text-sm" />
+                <ReviewText review={r.review} isSpoiler={r.isSpoiler} className="mt-2 line-clamp-6 whitespace-pre-line text-sm" />
                 <p className="mt-2 text-xs text-muted">{formatDate(r.date)}</p>
               </li>
             ))}

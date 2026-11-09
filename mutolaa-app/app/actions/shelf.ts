@@ -4,7 +4,7 @@ import { refresh, updateTag } from "next/cache";
 import { z } from "zod";
 import { uz } from "@/lib/i18n/uz";
 import { applyProgress, setStatusFor } from "@/lib/shelf-ops";
-import { FORMATS, joinNoteAnswer, NOTE_TYPES, parseReviewSpoiler, SPOILER_PREFIX, STATUSES, UNITS } from "@/lib/shelf-types";
+import { FORMATS, NOTE_TYPES, STATUSES, UNITS } from "@/lib/shelf-types";
 import { createServerSupabase, getSessionUser } from "@/lib/supabase/server";
 
 // Barcha amallar: foydalanuvchini tekshirish -> zod bilan validatsiya -> yozish (RLS + user_id filtri himoya qiladi) -> sahifani yangilash.
@@ -115,12 +115,11 @@ export async function saveReview(_prev: ActionResult | null, formData: FormData)
     .safeParse({ userBookId: formData.get("userBookId"), review: formData.get("review") ?? "" });
   if (!parsed.success) return fail();
   const { user, supabase } = await requireUser();
-  const cleanText = parseReviewSpoiler(parsed.data.review).text;
+  const review = parsed.data.review.trim() || null;
   const isSpoiler = formData.get("is_spoiler") === "on" || formData.get("is_spoiler") === "true";
-  const review = cleanText ? (isSpoiler ? `${SPOILER_PREFIX}${cleanText}` : cleanText) : null;
   const { data, error } = await supabase
     .from("user_books")
-    .update({ review })
+    .update({ review, review_is_spoiler: Boolean(review) && isSpoiler })
     .eq("id", parsed.data.userBookId)
     .eq("user_id", user.id)
     .select("book_id")
@@ -171,20 +170,15 @@ export async function saveNoteAnswer(noteId: number, answer: string): Promise<Ac
   const parsed = z.object({ noteId: id, answer: z.string().max(2_500) }).safeParse({ noteId, answer });
   if (!parsed.success) return fail();
   const { user, supabase } = await requireUser();
-  const { data: note } = await supabase
+  const clean = parsed.data.answer.trim() || null;
+  const { data, error } = await supabase
     .from("notes")
-    .select("content")
+    .update({ answer: clean, is_resolved: Boolean(clean) })
     .eq("id", parsed.data.noteId)
     .eq("user_id", user.id)
+    .select("id")
     .maybeSingle();
-  if (!note) return fail();
-  const nextContent = joinNoteAnswer(note.content, parsed.data.answer);
-  const { error } = await supabase
-    .from("notes")
-    .update({ content: nextContent, is_resolved: Boolean(parsed.data.answer.trim()) })
-    .eq("id", parsed.data.noteId)
-    .eq("user_id", user.id);
-  if (error) return fail();
+  if (error || !data) return fail();
   refresh();
   return { ok: true };
 }

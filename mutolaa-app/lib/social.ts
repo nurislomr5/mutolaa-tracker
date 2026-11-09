@@ -19,6 +19,7 @@ type ShelfRow = {
   status: ShelfStatus;
   rating: number | null;
   review: string | null;
+  review_is_spoiler: boolean;
   finished_at: string | null;
   updated_at: string;
   books: BookCardData;
@@ -38,7 +39,7 @@ export async function getPublicProfile(username: string) {
   const [{ data: shelf }, { count: followers }, { count: following }, { data: myFollow }, { data: myShelf }] = await Promise.all([
     supabase
       .from("user_books")
-      .select(`status, rating, review, finished_at, updated_at, books!inner(${BOOK_CARD})`)
+      .select(`status, rating, review, review_is_spoiler, finished_at, updated_at, books!inner(${BOOK_CARD})`)
       .eq("user_id", profile.id)
       .order("updated_at", { ascending: false }),
     supabase.from("follows").select("follower_id", { count: "exact", head: true }).eq("following_id", profile.id),
@@ -82,7 +83,13 @@ export async function getPublicProfile(username: string) {
     wantCount: rows.filter((r) => r.status === "want").length,
     reviews: rows
       .filter((r) => r.review)
-      .map((r) => ({ book: r.books, rating: r.rating, review: r.review!, date: r.finished_at ?? r.updated_at.slice(0, 10) })),
+      .map((r) => ({
+        book: r.books,
+        rating: r.rating,
+        review: r.review!,
+        isSpoiler: r.review_is_spoiler,
+        date: r.finished_at ?? r.updated_at.slice(0, 10),
+      })),
   };
 }
 
@@ -136,7 +143,7 @@ export async function getFeed(scope: "following" | "all", limit = 50): Promise<{
   return { items, now };
 }
 
-export type BookReview = { person: PublicPerson; rating: number | null; review: string | null; date: string };
+export type BookReview = { person: PublicPerson; rating: number | null; review: string | null; isSpoiler: boolean; date: string };
 
 // Kitob sahifasi: ochiq profilli oʻquvchilar baholari va taqrizlari (anonim klient — faqat ochiq maʼlumot)
 export async function getBookReviews(bookId: number) {
@@ -146,7 +153,7 @@ export async function getBookReviews(bookId: number) {
 
   const { data, error } = await createPublicClient()
     .from("user_books")
-    .select("rating, review, finished_at, updated_at, profiles!inner(id, username, display_name, avatar_url)")
+    .select("rating, review, review_is_spoiler, finished_at, updated_at, profiles!inner(id, username, display_name, avatar_url)")
     .eq("book_id", bookId)
     .or("rating.not.is.null,review.not.is.null")
     .order("updated_at", { ascending: false })
@@ -155,6 +162,7 @@ export async function getBookReviews(bookId: number) {
   const rows = (data ?? []) as unknown as {
     rating: number | null;
     review: string | null;
+    review_is_spoiler: boolean;
     finished_at: string | null;
     updated_at: string;
     profiles: PublicPerson;
@@ -163,6 +171,14 @@ export async function getBookReviews(bookId: number) {
   return {
     average: rated.length ? rated.reduce((s, r) => s + Number(r.rating), 0) / rated.length : null,
     ratingCount: rated.length,
-    reviews: rows.map((r): BookReview => ({ person: r.profiles, rating: r.rating, review: r.review, date: r.finished_at ?? r.updated_at.slice(0, 10) })),
+    reviews: rows.map(
+      (r): BookReview => ({
+        person: r.profiles,
+        rating: r.rating,
+        review: r.review,
+        isSpoiler: r.review_is_spoiler,
+        date: r.finished_at ?? r.updated_at.slice(0, 10),
+      }),
+    ),
   };
 }

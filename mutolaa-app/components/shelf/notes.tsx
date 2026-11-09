@@ -8,7 +8,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { formatDate } from "@/lib/format";
 import { uz } from "@/lib/i18n/uz";
-import { NOTE_TYPES, splitNoteAnswer, type Note } from "@/lib/shelf-types";
+import { NOTE_TYPES, type Note } from "@/lib/shelf-types";
 import { cn } from "@/lib/utils";
 
 const TONE = { iqtibos: "accent", savol: "warning", lugat: "neutral", xulosa: "accent", taymkod: "neutral" } as const;
@@ -104,7 +104,7 @@ async function shareQuoteImage(body: string, bookTitle?: string, refPoint?: stri
 export function NoteItem({ note, book }: { note: Note; book?: { slug: string; title: string } }) {
   const [pending, start] = useTransition();
   const t = uz.notes;
-  const { body, answer } = splitNoteAnswer(note.content);
+  const { content: body, answer } = note;
   const [editingAnswer, setEditingAnswer] = useState(false);
   const [answerText, setAnswerText] = useState(answer ?? "");
 

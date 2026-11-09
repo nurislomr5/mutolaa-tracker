@@ -7,7 +7,6 @@ import { PUBLISHER_ALIASES, publisherSlug } from "@/lib/publishers";
 import { safeEqual } from "@/lib/safe-equal";
 import { safeNext } from "@/lib/safe-next";
 import { defaultsFor } from "@/lib/shelf-ops";
-import { joinNoteAnswer, parseReviewSpoiler, SPOILER_PREFIX, splitNoteAnswer } from "@/lib/shelf-types";
 import { addDays, computeStreaks, dayKey } from "@/lib/stats-utils";
 import { parseHilolPage } from "@/scripts/import-hilol";
 
@@ -127,31 +126,6 @@ describe("nashriyot taxalluslari", () => {
       expect(publisherSlug(alias.replace(/-/g, " "))).toBe(main);
       expect(PUBLISHER_ALIASES[main]).toBeUndefined();
     }
-  });
-});
-
-describe("savol javobi va spoyler taqriz", () => {
-  it("savol va javobni birlashtiradi hamda ajratadi", () => {
-    const combined = joinNoteAnswer("Nega Otabek Margʻilonga bordi?", "Savdo ishlari bilan");
-    expect(splitNoteAnswer(combined)).toEqual({
-      body: "Nega Otabek Margʻilonga bordi?",
-      answer: "Savdo ishlari bilan",
-    });
-    expect(splitNoteAnswer(joinNoteAnswer(combined, ""))).toEqual({
-      body: "Nega Otabek Margʻilonga bordi?",
-      answer: null,
-    });
-  });
-
-  it("spoyler belgisini aniqlaydi", () => {
-    expect(parseReviewSpoiler(`${SPOILER_PREFIX}Oxirida Kumush vafot etadi`)).toEqual({
-      isSpoiler: true,
-      text: "Oxirida Kumush vafot etadi",
-    });
-    expect(parseReviewSpoiler("Ajoyib asar!")).toEqual({
-      isSpoiler: false,
-      text: "Ajoyib asar!",
-    });
   });
 });
 

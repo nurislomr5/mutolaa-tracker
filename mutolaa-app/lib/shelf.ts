@@ -10,7 +10,7 @@ export * from "@/lib/shelf-types";
 // shuning uchun user_books/profiles soʻrovlari har doim joriy foydalanuvchi bilan aniq cheklanadi.
 
 const USER_BOOK_COLUMNS =
-  "id, book_id, status, format, unit, current_value, total_value, started_at, finished_at, rating, review, updated_at";
+  "id, book_id, status, format, unit, current_value, total_value, started_at, finished_at, rating, review, review_is_spoiler, updated_at";
 const BOOK_CARD = "id, slug, title, author_names, cover_url, formats, mutolaa_rating, audio_seconds, is_premium";
 
 
@@ -30,7 +30,7 @@ export const getBookShelfState = cache(async (bookId: number) => {
     const [{ data: noteRows }, { data: sessionRows }] = await Promise.all([
       supabase
         .from("notes")
-        .select("id, user_book_id, type, reference_point, content, is_resolved, created_at")
+        .select("id, user_book_id, type, reference_point, content, answer, is_resolved, created_at")
         .eq("user_book_id", userBook.id)
         .order("created_at", { ascending: false }),
       supabase
@@ -98,7 +98,7 @@ export async function getNotes({ type, openOnly, q }: { type?: NoteType; openOnl
   const supabase = await createServerSupabase();
   let query = supabase
     .from("notes")
-    .select("id, user_book_id, type, reference_point, content, is_resolved, created_at, user_books!inner(books!inner(slug, title))")
+    .select("id, user_book_id, type, reference_point, content, answer, is_resolved, created_at, user_books!inner(books!inner(slug, title))")
     .order("created_at", { ascending: false });
   if (type) query = query.eq("type", type);
   if (openOnly) query = query.eq("type", "savol").eq("is_resolved", false);
@@ -109,7 +109,7 @@ export async function getNotes({ type, openOnly, q }: { type?: NoteType; openOnl
   );
   const norm = uzNormalize(q);
   if (!norm) return items;
-  return items.filter((n) => uzNormalize(`${n.content} ${n.reference_point ?? ""} ${n.book.title}`).includes(norm));
+  return items.filter((n) => uzNormalize(`${n.content} ${n.answer ?? ""} ${n.reference_point ?? ""} ${n.book.title}`).includes(norm));
 }
 
 export type Profile = {

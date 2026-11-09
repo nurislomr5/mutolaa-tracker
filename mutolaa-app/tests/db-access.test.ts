@@ -163,6 +163,47 @@ describe("migratsiyalar va ruxsatlar", () => {
     expect(r.rows).toHaveLength(1);
   });
 
+  it("008: eski spoyler prefiksi va savol javobi alohida ustunlarga koʻchadi", async () => {
+    const ub = (await db.query<{ id: number }>(`select id from public.user_books where user_id = $1 limit 1`, [A])).rows[0].id;
+    await db.query(`update public.user_books set review = $2, review_is_spoiler = false where id = $1`, [ub, "[spoiler]\nOxirida Kumush vafot etadi\n"]);
+    const legacy = await db.query<{ id: number }>(
+      `insert into public.notes (user_id, user_book_id, type, content) values
+         ($1, $2, 'savol', $3), ($1, $2, 'savol', $4), ($1, $2, 'iqtibos', $5) returning id`,
+      [A, ub, "Nega Otabek Margʻilonga bordi?\n\n💡 Javob: Savdo ishlari bilan", "Javobsiz savol\n\n💡 Javob:   ", "Oddiy iqtibos"],
+    );
+    await db.exec(`alter table public.user_books disable trigger user_books_set_updated_at`);
+    await db.query(`update public.user_books set updated_at = '2026-01-15T10:00:00Z' where id = $1`, [ub]);
+    await db.exec(`alter table public.user_books enable trigger user_books_set_updated_at`);
+    const migration = fs.readdirSync(MIGRATIONS).find((f) => f.endsWith("_review_spoiler_note_answer.sql"))!;
+    await db.exec(fs.readFileSync(path.join(MIGRATIONS, migration), "utf8"));
+    // sana oʻzgarmadi (updated_at trigger koʻchirish vaqtida oʻchirilgan), keyin yana yoqilgan
+    const kept = await db.query<{ updated_at: Date }>(`select updated_at from public.user_books where id = $1`, [ub]);
+    expect(kept.rows[0].updated_at.toISOString()).toBe("2026-01-15T10:00:00.000Z");
+
+    const review = await db.query(`select review, review_is_spoiler from public.user_books where id = $1`, [ub]);
+    expect(review.rows[0]).toEqual({ review: "Oxirida Kumush vafot etadi", review_is_spoiler: true });
+    const notes = await db.query(`select content, answer from public.notes where id = any($1) order by id`, [legacy.rows.map((r) => r.id)]);
+    expect(notes.rows).toEqual([
+      { content: "Nega Otabek Margʻilonga bordi?", answer: "Savdo ishlari bilan" },
+      { content: "Javobsiz savol", answer: null },
+      { content: "Oddiy iqtibos", answer: null },
+    ]);
+
+    // Ikkinchi marta ishga tushirish hech narsani buzmaydi
+    await db.exec(fs.readFileSync(path.join(MIGRATIONS, migration), "utf8"));
+    expect((await db.query(`select review, review_is_spoiler from public.user_books where id = $1`, [ub])).rows[0]).toEqual(review.rows[0]);
+
+    // Yangi ustunlar: egasi yozadi, mehmon ochiq profilda spoyler belgisini koʻradi, begona yozolmaydi
+    await as("authenticated", A, `update public.user_books set review_is_spoiler = false where id = $1`, [ub]);
+    const bumped = await db.query<{ updated_at: Date }>(`select updated_at from public.user_books where id = $1`, [ub]);
+    expect(bumped.rows[0].updated_at.toISOString()).not.toBe("2026-01-15T10:00:00.000Z"); // trigger yana yoqilgan
+    expect((await as("anon", null, `select review_is_spoiler from public.user_books where id = $1`, [ub])).rows).toEqual([{ review_is_spoiler: false }]);
+    expect((await as("authenticated", B, `update public.user_books set review_is_spoiler = true where id = $1 returning 1`, [ub])).rows).toHaveLength(0);
+    const answered = await as("authenticated", A, `update public.notes set answer = 'Yangi javob', is_resolved = true where id = $1 returning id`, [legacy.rows[1].id]);
+    expect(answered.rows).toHaveLength(1);
+    expect((await as("authenticated", B, `update public.notes set answer = 'hack' where id = $1 returning id`, [legacy.rows[1].id])).rows).toHaveLength(0);
+  });
+
   it("006 va 007 qayta ishga tushirilsa ham xato bermaydi", async () => {
     for (const f of fs.readdirSync(MIGRATIONS).filter((f) => /_(security_lockdown|book_reports)\.sql$/.test(f))) {
       await db.exec(fs.readFileSync(path.join(MIGRATIONS, f), "utf8"));

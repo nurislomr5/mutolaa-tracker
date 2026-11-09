@@ -21,6 +21,7 @@ export type UserBook = {
   finished_at: string | null;
   rating: number | null;
   review: string | null;
+  review_is_spoiler: boolean;
   updated_at: string;
 };
 
@@ -30,6 +31,7 @@ export type Note = {
   type: NoteType;
   reference_point: string | null;
   content: string;
+  answer: string | null;
   is_resolved: boolean;
   created_at: string;
 };
@@ -44,31 +46,6 @@ export type ReadingSession = {
 };
 
 export type Shelf = { id: number; name: string; count: number };
-
-export const SPOILER_PREFIX = "[spoiler]\n";
-
-export function parseReviewSpoiler(raw: string | null | undefined): { text: string; isSpoiler: boolean } {
-  if (!raw) return { text: "", isSpoiler: false };
-  if (raw.startsWith(SPOILER_PREFIX)) return { text: raw.slice(SPOILER_PREFIX.length), isSpoiler: true };
-  return { text: raw, isSpoiler: false };
-}
-
-export const ANSWER_MARKER = "\n\n💡 Javob: ";
-
-export function splitNoteAnswer(content: string): { body: string; answer: string | null } {
-  const idx = content.indexOf(ANSWER_MARKER);
-  if (idx < 0) return { body: content, answer: null };
-  return {
-    body: content.slice(0, idx).trim(),
-    answer: content.slice(idx + ANSWER_MARKER.length).trim() || null,
-  };
-}
-
-export function joinNoteAnswer(body: string, answer: string | null | undefined): string {
-  const cleanBody = splitNoteAnswer(body).body;
-  const cleanAnswer = (answer ?? "").trim();
-  return cleanAnswer ? `${cleanBody}${ANSWER_MARKER}${cleanAnswer}` : cleanBody;
-}
 
 // Toshkent vaqti boʻyicha bugungi sana (YYYY-MM-DD)
 export function todayInTashkent() {

@@ -4,25 +4,23 @@ import { useActionState, useState } from "react";
 import { saveReview } from "@/app/actions/shelf";
 import { Button } from "@/components/ui/button";
 import { uz } from "@/lib/i18n/uz";
-import { parseReviewSpoiler } from "@/lib/shelf-types";
 
-export function ReviewForm({ userBookId, review }: { userBookId: number; review: string | null }) {
+export function ReviewForm({ userBookId, review, isSpoiler }: { userBookId: number; review: string | null; isSpoiler: boolean }) {
   const [state, action, pending] = useActionState(saveReview, null);
-  const parsed = parseReviewSpoiler(review);
 
   return (
     <form action={action} className="space-y-2">
       <input type="hidden" name="userBookId" value={userBookId} />
       <textarea
         name="review"
-        defaultValue={parsed.text}
+        defaultValue={review ?? ""}
         rows={4}
         maxLength={10_000}
         placeholder={uz.shelf.reviewPlaceholder}
         className="w-full rounded-lg border border-border bg-surface p-3 text-sm placeholder:text-muted focus-visible:outline-2 focus-visible:outline-accent"
       />
       <label className="flex items-center gap-2 text-xs text-muted">
-        <input type="checkbox" name="is_spoiler" defaultChecked={parsed.isSpoiler} className="h-4 w-4 accent-accent" />
+        <input type="checkbox" name="is_spoiler" defaultChecked={isSpoiler} className="h-4 w-4 accent-accent" />
         <span>{uz.shelf.spoilerLabel}</span>
       </label>
       <div className="flex items-center gap-3">
@@ -35,10 +33,17 @@ export function ReviewForm({ userBookId, review }: { userBookId: number; review:
   );
 }
 
-export function ReviewText({ review, className = "mt-2 line-clamp-6 whitespace-pre-line text-sm" }: { review: string | null; className?: string }) {
-  const { isSpoiler, text } = parseReviewSpoiler(review);
+export function ReviewText({
+  review,
+  isSpoiler,
+  className = "mt-2 line-clamp-6 whitespace-pre-line text-sm",
+}: {
+  review: string | null;
+  isSpoiler: boolean;
+  className?: string;
+}) {
   const [revealed, setRevealed] = useState(!isSpoiler);
-  if (!text) return null;
+  if (!review) return null;
 
   if (!revealed) {
     return (
@@ -51,5 +56,5 @@ export function ReviewText({ review, className = "mt-2 line-clamp-6 whitespace-p
     );
   }
 
-  return <p className={className}>{text}</p>;
+  return <p className={className}>{review}</p>;
 }
