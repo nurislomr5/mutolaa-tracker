@@ -599,6 +599,35 @@ export const uz = {
     body: "Bu sahifa hali mavjud emas yoki oʻchirilgan.",
     back: "Bosh sahifaga qaytish",
   },
+  admin: {
+    duplicatesTitle: "Takroriy kitoblar",
+    duplicatesIntro:
+      "Bir xil ISBN yoki bir xil nom va muallifli kitoblar. Qaysi nusxa qolishini tanlang — ikkinchisining javon yozuvlari, baholari, qaydlari, nashrlari va eski manzili unga koʻchadi. Bu amalni ortga qaytarib boʻlmaydi.",
+    settingsLink: "Admin: takroriy kitoblar →",
+    manualTitle: "Ikki kitobni qoʻlda tanlash",
+    manualHint: "Kitob manzili yoki havolasi, masalan: otkan-kunlar yoki https://…/kitob/otkan-kunlar",
+    manualFirst: "Birinchi kitob",
+    manualSecond: "Ikkinchi kitob",
+    manualShow: "Koʻrsatish",
+    manualNotFound: "Kitoblardan biri topilmadi yoki ikkalasi bir xil.",
+    none: "Hozircha takror topilmadi. 🎉",
+    reason: { isbn: "Bir xil ISBN", nom: "Bir xil nom va muallif", "isbn+nom": "ISBN va nom bir xil", "qoʻlda": "Qoʻlda tanlangan" } as Record<
+      string,
+      string
+    >,
+    keepThis: "Shu qolsin",
+    suggested: "Tavsiya",
+    mutolaaLocked: "Mutolaa kitobi — u qolishi kerak",
+    notDuplicate: "Takror emas",
+    confirm: (keep: string, remove: string) =>
+      `«${remove}» kitobi «${keep}» ga qoʻshilib, oʻchiriladi. Javonlar, baholar, qaydlar va nashrlar koʻchadi. Davom etilsinmi?`,
+    merged: (users: number) => `✓ Birlashtirildi${users ? ` — ${users} ta foydalanuvchi javoni koʻchirildi` : ""}.`,
+    dismissed: "✓ Bu juftlik boshqa koʻrsatilmaydi.",
+    forbidden: "Bu amal faqat admin uchun.",
+    mutolaaTarget: "Mutolaa kitobi asosiy qolishi kerak — boshqa nusxani tanlang.",
+    readers: (n: number) => `${n} ta oʻquvchi`,
+    sources: "Manbalar",
+  },
 } as const;
 
 export type Dictionary = typeof uz;

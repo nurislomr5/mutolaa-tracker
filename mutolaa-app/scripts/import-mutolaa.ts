@@ -463,6 +463,15 @@ async function main() {
     slugs = slugs.filter((s) => !fresh.has(s));
     console.log(`Oxirgi ${FRESH_DAYS} kunda yangilanganlar oʻtkazib yuborildi: ${fresh.size}`);
   }
+  if (db) {
+    // Takror sifatida boshqa kitobga qoʻshilgan (admin birlashtirgan) kitoblar qayta yaratilmasin
+    const { data: merged, error } = await db.from("book_redirects").select("old_slug");
+    if (error) throw new Error(`book_redirects: ${error.message}`);
+    const mergedSlugs = new Set((merged ?? []).map((r) => r.old_slug as string));
+    const before = slugs.length;
+    slugs = slugs.filter((s) => !mergedSlugs.has(s));
+    if (before !== slugs.length) console.log(`Birlashtirilgan (takror) kitoblar oʻtkazib yuborildi: ${before - slugs.length}`);
+  }
   slugs = slugs.slice(0, LIMIT);
   console.log(`Yuklanadi: ${slugs.length} ta`);
 

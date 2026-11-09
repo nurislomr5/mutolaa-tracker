@@ -9,6 +9,7 @@ export default function robots(): MetadataRoute.Robots {
       allow: "/",
       disallow: [
         "/javonim",
+        "/admin/",
         "/qaydlar",
         "/statistika",
         "/sozlamalar",

@@ -1,4 +1,5 @@
 import type { Metadata } from "next";
+import Link from "next/link";
 import { redirect } from "next/navigation";
 import { Suspense } from "react";
 import { signOut } from "@/app/kirish/actions";
@@ -6,6 +7,7 @@ import { Button } from "@/components/ui/button";
 import { InstallAppCard } from "@/components/pwa/install-app";
 import { Card, CardTitle } from "@/components/ui/card";
 import { Container } from "@/components/ui/container";
+import { getAdminUser } from "@/lib/admin";
 import { isTelegramEmail } from "@/lib/bot/login";
 import { uz } from "@/lib/i18n/uz";
 import { getProfile, isTelegramLinked } from "@/lib/shelf";
@@ -19,7 +21,7 @@ export const metadata: Metadata = { title: uz.settings.title };
 async function Settings() {
   const user = await getSessionUser();
   if (!user) redirect("/kirish?next=/sozlamalar");
-  const [profile, telegramLinked] = await Promise.all([getProfile(), isTelegramLinked()]);
+  const [profile, telegramLinked, admin] = await Promise.all([getProfile(), isTelegramLinked(), getAdminUser()]);
   const t = uz.settings;
   const emailLabel = isTelegramEmail(user.email) ? "Telegram orqali kirgan" : user.email;
 
@@ -49,6 +51,13 @@ async function Settings() {
             <InstallAppCard />
           </div>
         </Card>
+        {admin && (
+          <Card>
+            <Link href="/admin/takrorlar" className="text-sm font-medium text-accent hover:underline">
+              {uz.admin.settingsLink}
+            </Link>
+          </Card>
+        )}
         <Card>
           <CardTitle>{uz.auth.account}</CardTitle>
           <form action={signOut} className="mt-4">

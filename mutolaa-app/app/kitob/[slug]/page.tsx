@@ -1,6 +1,6 @@
 import type { Metadata } from "next";
 import Link from "next/link";
-import { notFound } from "next/navigation";
+import { notFound, permanentRedirect } from "next/navigation";
 import { Suspense } from "react";
 import { BookCover } from "@/components/book/book-cover";
 import { BookGrid } from "@/components/book/book-card";
@@ -9,7 +9,7 @@ import { SOURCE_NAMES, WhereToGet } from "@/components/book/where-to-get";
 import { Badge } from "@/components/ui/badge";
 import { buttonClasses } from "@/components/ui/button";
 import { Container } from "@/components/ui/container";
-import { getAuthor, getBook, getPopularBooks, type BookDetail } from "@/lib/catalog";
+import { getAuthor, getBook, getBookRedirect, getPopularBooks, type BookDetail } from "@/lib/catalog";
 import { bookDescription, bookJsonLd } from "@/lib/seo";
 import { formatCount, formatDuration, formatRating } from "@/lib/format";
 import { uz } from "@/lib/i18n/uz";
@@ -25,7 +25,12 @@ export async function generateStaticParams() {
 export async function generateMetadata({ params }: PageProps<"/kitob/[slug]">): Promise<Metadata> {
   const { slug } = await params;
   const book = await getBook(slug);
-  if (!book) return { title: uz.notFound.title };
+  if (!book) {
+    // takror sifatida birlashtirilgan kitob — eski manzil asosiy kitobga doimiy yoʻnaltiriladi
+    const target = await getBookRedirect(slug);
+    if (target) permanentRedirect(`/kitob/${target}`);
+    return { title: uz.notFound.title };
+  }
   const title = book.author_names ? `${book.title} — ${book.author_names}` : book.title;
   const description = bookDescription(book);
   // OG rasm shu papkadagi opengraph-image.tsx dan avtomatik qoʻshiladi
@@ -68,7 +73,11 @@ async function SameAuthor({ book }: { book: BookDetail }) {
 async function BookView({ params }: { params: PageProps<"/kitob/[slug]">["params"] }) {
   const { slug } = await params;
   const book = await getBook(slug);
-  if (!book) notFound();
+  if (!book) {
+    const target = await getBookRedirect(slug);
+    if (target) permanentRedirect(`/kitob/${target}`);
+    notFound();
+  }
 
   const t = uz.book;
   const rating = formatRating(book.mutolaa_rating);

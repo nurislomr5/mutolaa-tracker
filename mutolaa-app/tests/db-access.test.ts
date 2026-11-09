@@ -335,3 +335,118 @@ describe("20261109000010: Hilol importeri kitob yarata oladi", () => {
     await expect(as("service_role", null, `insert into public.books (slug, title, source) values ('x-sinov', 'X', 'boshqa')`)).rejects.toThrow(/books_source_check/);
   });
 });
+
+describe("20261110000011: takroriy kitoblarni birlashtirish", () => {
+  const q1 = async <T = Record<string, unknown>>(sql: string, params: unknown[] = []) => (await db.query<T>(sql, params)).rows;
+  let T: number, S: number, ubA_t: number, ubA_s: number;
+
+  beforeAll(async () => {
+    [{ id: T }] = await q1<{ id: number }>(
+      `insert into public.books (slug, title, author_names, source, formats, mutolaa_id) values ('t-kitob', 'Virtual olam bolalari', null, 'mutolaa', '{audio}', 500) returning id`,
+    );
+    [{ id: S }] = await q1<{ id: number }>(
+      `insert into public.books (slug, title, author_names, source, formats, cover_url, isbn, page_count)
+       values ('s-kitob', 'Виртуал олам болалари (кирилл)', 'Абдулкарим Ҳасан', 'asaxiy', '{paper}', 'https://c/s.jpg', '978-9910-273-91-9', 176) returning id`,
+    );
+    const [{ id: author }] = await q1<{ id: number }>(`insert into public.authors (slug, name) values ('abdulkarim-hasan', 'Abdulkarim Hasan') returning id`);
+    await q1(`insert into public.book_authors (book_id, author_id, position) values ($1, $2, 0)`, [S, author]);
+    await q1(`insert into public.book_sources (book_id, source, external_id, url) values ($1, 'asaxiy', 'vob', 'https://a/vob')`, [S]);
+    await q1(`insert into public.book_redirects (old_slug, book_id) values ('eski-eski', $1)`, [S]);
+
+    // A: ikkala nusxa (T — oʻqimoqchi, S — oʻqigan, baho, spoylerli taqriz, qayd, sessiya); B: faqat S
+    [{ id: ubA_t }] = await q1<{ id: number }>(`insert into public.user_books (user_id, book_id, status) values ($1, $2, 'want') returning id`, [A, T]);
+    [{ id: ubA_s }] = await q1<{ id: number }>(
+      `insert into public.user_books (user_id, book_id, status, current_value, total_value, rating, review, review_is_spoiler, finished_at)
+       values ($1, $2, 'read', 176, 176, 4, 'Zoʻr', true, '2026-10-01') returning id`,
+      [A, S],
+    );
+    await q1(`insert into public.user_books (user_id, book_id, status) values ($1, $2, 'reading')`, [B, S]);
+    await q1(`insert into public.notes (user_id, user_book_id, type, content) values ($1, $2, 'iqtibos', 'Sevimli joy')`, [A, ubA_s]);
+    await q1(`insert into public.reading_sessions (user_id, user_book_id, delta, new_value, source) values ($1, $2, 176, 176, 'web')`, [A, ubA_s]);
+    const [{ id: shelfA }] = await q1<{ id: number }>(`insert into public.shelves (user_id, name) values ($1, 'Birlashtirish') returning id`, [A]);
+    await q1(`insert into public.shelf_books (shelf_id, book_id) values ($1, $2), ($1, $3)`, [shelfA, T, S]);
+    await q1(`insert into public.book_notifications (user_id, book_id) values ($1, $2), ($1, $3)`, [A, T, S]);
+    await q1(`insert into public.book_reports (user_id, book_id, message) values ($1, $2, 'Takror kitob')`, [B, S]);
+  });
+
+  it("nom kaliti lotin/kirill va qavsdagi izohni tenglashtiradi, raqamli izohni saqlaydi", async () => {
+    const [r] = await q1<{ a: string; b: string; c: string; d: string }>(
+      `select public.book_title_key('Виртуал олам болалари (кирилл)') a, public.book_title_key('Virtual olam bolalari (lotincha)') b,
+              public.book_title_key('Siyrati nabaviya (1-juz)') c, public.book_title_key('Siyrati nabaviya (2-juz)') d`,
+    );
+    expect(r.a).toBe(r.b);
+    expect(r.c).not.toBe(r.d);
+  });
+
+  it("nomzodlar: nom boʻyicha juftlik topiladi, 'takror emas' belgilangani chiqmaydi", async () => {
+    const pairs = await q1<{ book_a: number; book_b: number; reason: string }>(`select * from public.book_duplicate_candidates(500)`);
+    expect(pairs).toContainEqual({ book_a: T, book_b: S, reason: "nom" });
+    await q1(`insert into public.book_duplicate_dismissals (book_a, book_b) values ($1, $2)`, [T, S]);
+    const after = await q1<{ book_a: number; book_b: number }>(`select * from public.book_duplicate_candidates(500)`);
+    expect(after.some((p) => p.book_a === T && p.book_b === S)).toBe(false);
+  });
+
+  it("faqat service role chaqira oladi, admin belgisi foydalanuvchiga yopiq", async () => {
+    await expectDenied("authenticated", A, `select public.merge_books($1, $2)`, [T, S]);
+    await expectDenied("anon", null, `select * from public.book_duplicate_candidates(10)`);
+    await expectDenied("authenticated", A, `select is_admin from public.profiles where id = $1`, [A]);
+    await expectDenied("authenticated", A, `update public.profiles set is_admin = true where id = $1`, [A]);
+  });
+
+  it("Mutolaa kitobi ikkinchisiga qoʻshilmaydi (teskari yoʻnalish rad etiladi)", async () => {
+    await expect(as("service_role", null, `select public.merge_books($1, $2)`, [S, T])).rejects.toThrow(/Mutolaa/);
+    expect(await q1(`select id from public.books where id in ($1, $2)`, [T, S])).toHaveLength(2);
+  });
+
+  it("birlashtiradi: javon, qayd, sessiya, javonlar, lenta, xabarlar, nashrlar va yoʻnaltirishlar koʻchadi", async () => {
+    const before = (await q1<{ n: number }>(`select count(*)::int n from public.activities where book_id in ($1, $2)`, [T, S]))[0].n;
+    const res = (await as("service_role", null, `select public.merge_books($1, $2) as r`, [T, S])).rows[0].r as Record<string, unknown>;
+    expect(res).toMatchObject({ target: T, source: S, moved_users: 1, merged_users: 1, source_slug: "s-kitob" });
+
+    expect(await q1(`select id from public.books where id = $1`, [S])).toHaveLength(0);
+    const [book] = await q1(`select cover_url, isbn, page_count, formats, author_names, mutolaa_id from public.books where id = $1`, [T]);
+    expect(book).toEqual({
+      cover_url: "https://c/s.jpg",
+      isbn: "978-9910-273-91-9",
+      page_count: 176,
+      formats: ["audio", "paper"],
+      author_names: "Абдулкарим Ҳасан",
+      mutolaa_id: 500,
+    });
+    expect(await q1(`select position from public.book_authors where book_id = $1`, [T])).toHaveLength(1);
+    expect(await q1(`select source from public.book_sources where book_id = $1`, [T])).toEqual([{ source: "asaxiy" }]);
+
+    // A: bitta yozuv; oʻqigan nusxa asos (holat, baho, spoylerli taqriz); qayd va sessiya saqlangan
+    const ubs = await q1(
+      `select id, status, rating::text, review, review_is_spoiler, finished_at::text from public.user_books where user_id = $1 and book_id = $2`,
+      [A, T],
+    );
+    expect(ubs).toEqual([{ id: ubA_t, status: "read", rating: "4.0", review: "Zoʻr", review_is_spoiler: true, finished_at: "2026-10-01" }]);
+    expect(await q1(`select content from public.notes where user_book_id = $1`, [ubA_t])).toEqual([{ content: "Sevimli joy" }]);
+    expect(await q1(`select delta from public.reading_sessions where user_book_id = $1`, [ubA_t])).toEqual([{ delta: 176 }]);
+    expect(await q1(`select status from public.user_books where user_id = $1 and book_id = $2`, [B, T])).toEqual([{ status: "reading" }]);
+
+    expect(
+      await q1(`select book_id from public.shelf_books where shelf_id in (select id from public.shelves where name = 'Birlashtirish')`),
+    ).toEqual([{ book_id: T }]);
+    expect((await q1<{ n: number }>(`select count(*)::int n from public.book_notifications where book_id = $1 and user_id = $2`, [T, A]))[0].n).toBe(1);
+    expect(await q1(`select book_id from public.book_reports where message = 'Takror kitob'`)).toEqual([{ book_id: T }]);
+    // Birlashtirish lentaga yangi yozuv qoʻshmaydi
+    expect((await q1<{ n: number }>(`select count(*)::int n from public.activities where book_id = $1`, [T]))[0].n).toBe(before);
+
+    expect(await q1(`select old_slug, book_id from public.book_redirects where book_id = $1 order by old_slug`, [T])).toEqual([
+      { old_slug: "eski-eski", book_id: T },
+      { old_slug: "s-kitob", book_id: T },
+    ]);
+    expect((await as("anon", null, `select book_id from public.book_redirects where old_slug = 's-kitob'`)).rows).toEqual([{ book_id: T }]);
+
+    // Triggerlar qayta yoqilgan: keyingi oʻzgarish lentaga tushadi (bir soat ichidagi holatlar bitta yozuvga almashadi)
+    await q1(`update public.user_books set status = 'read' where user_id = $1 and book_id = $2`, [B, T]);
+    expect(await q1(`select kind from public.activities where user_id = $1 and book_id = $2 order by id desc limit 1`, [B, T])).toEqual([{ kind: "read" }]);
+  });
+
+  it("notoʻgʻri juftlik rad etiladi", async () => {
+    await expect(as("service_role", null, `select public.merge_books($1, $1)`, [T])).rejects.toThrow(/juftlik/);
+    await expect(as("service_role", null, `select public.merge_books($1, 999999)`, [T])).rejects.toThrow(/topilmadi/);
+  });
+});

@@ -208,6 +208,16 @@ export async function getBook(slug: string) {
   } satisfies BookDetail;
 }
 
+// Birlashtirilgan (oʻchirilgan) kitobning eski manzili -> asosiy kitob slug'i (book_redirects, 20261110000011)
+export async function getBookRedirect(slug: string) {
+  "use cache";
+  cacheLife("hours");
+  cacheTag("catalog", `book:${slug}`);
+
+  const { data } = await createPublicClient().from("book_redirects").select("books!inner(slug)").eq("old_slug", slug).maybeSingle();
+  return (data as unknown as { books: { slug: string } } | null)?.books.slug ?? null;
+}
+
 export async function getAuthor(slug: string) {
   "use cache";
   cacheLife("hours");
