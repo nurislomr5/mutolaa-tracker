@@ -1,6 +1,8 @@
 import type { Metadata, Viewport } from "next";
 import { Inter, Literata } from "next/font/google";
+import { Suspense } from "react";
 import { BottomNav } from "@/components/bottom-nav";
+import { OfflineSyncSlot } from "@/components/offline/offline-sync-slot";
 import { SiteHeader } from "@/components/site-header";
 import { SiteFooter } from "@/components/site-footer";
 import { TelegramAutoLogin } from "@/components/telegram-auto-login";
@@ -64,6 +66,9 @@ export default function RootLayout({ children }: LayoutProps<"/">) {
         <SiteFooter />
         <BottomNav />
         <PwaSetup />
+        <Suspense fallback={null}>
+          <OfflineSyncSlot />
+        </Suspense>
       </body>
     </html>
   );
