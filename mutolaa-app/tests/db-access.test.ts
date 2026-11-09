@@ -450,3 +450,58 @@ describe("20261110000011: takroriy kitoblarni birlashtirish", () => {
     await expect(as("service_role", null, `select public.merge_books($1, 999999)`, [T])).rejects.toThrow(/topilmadi/);
   });
 });
+
+describe("20261110000012: taqrizlarga 'Foydali' ovozi", () => {
+  const q1 = async <T = Record<string, unknown>>(sql: string, params: unknown[] = []) => (await db.query<T>(sql, params)).rows;
+  const C = "00000000-0000-0000-0000-00000000000c";
+  let book: number, reviewA: number, reviewB: number;
+  const counts = async (bookId: number) =>
+    (await as("anon", null, `select user_book_id, helpful from public.review_helpful_counts($1) order by user_book_id`, [bookId])).rows;
+
+  beforeAll(async () => {
+    await db.query(`insert into auth.users (id, email) values ($1, 'c@x.test')`, [C]);
+    [{ id: book }] = await q1<{ id: number }>(`insert into public.books (slug, title, source) values ('ovoz-kitob', 'Ovoz', 'mutolaa') returning id`);
+    // A — ochiq profil (oldingi testlarda), B — yopiq profil
+    [{ id: reviewA }] = await q1<{ id: number }>(
+      `insert into public.user_books (user_id, book_id, status, review) values ($1, $2, 'read', 'Juda foydali kitob') returning id`,
+      [A, book],
+    );
+    [{ id: reviewB }] = await q1<{ id: number }>(
+      `insert into public.user_books (user_id, book_id, status, review) values ($1, $2, 'read', 'Yopiq profil taqrizi') returning id`,
+      [B, book],
+    );
+  });
+
+  it("boshqa odamning ochiq taqriziga ovoz beradi; ikki marta, oʻziga va yopiq profilga — yoʻq", async () => {
+    await as("authenticated", B, `insert into public.review_votes (user_book_id) values ($1)`, [reviewA]);
+    await as("authenticated", C, `insert into public.review_votes (user_book_id) values ($1)`, [reviewA]);
+    await expect(as("authenticated", B, `insert into public.review_votes (user_book_id) values ($1)`, [reviewA])).rejects.toThrow(/duplicate key/);
+    await expectDenied("authenticated", A, `insert into public.review_votes (user_book_id) values ($1)`, [reviewA]);
+    await expectDenied("authenticated", A, `insert into public.review_votes (user_book_id) values ($1)`, [reviewB]);
+    await expectDenied("authenticated", B, `insert into public.review_votes (user_id, user_book_id) values ($1, $2)`, [C, reviewA]);
+    await expectDenied("anon", null, `insert into public.review_votes (user_book_id) values ($1)`, [reviewA]);
+    expect(await counts(book)).toEqual([{ user_book_id: reviewA, helpful: 2 }]);
+  });
+
+  it("kim ovoz bergani yashirin: har kim faqat oʻz ovozini koʻradi", async () => {
+    expect((await as("authenticated", B, `select user_book_id from public.review_votes`)).rows).toEqual([{ user_book_id: reviewA }]);
+    expect((await as("authenticated", A, `select user_book_id from public.review_votes`)).rows).toEqual([]);
+    await expectDenied("anon", null, `select * from public.review_votes`);
+  });
+
+  it("ovozni qaytarib olish faqat oʻziniki", async () => {
+    expect((await as("authenticated", A, `delete from public.review_votes where user_book_id = $1 returning 1`, [reviewA])).rows).toHaveLength(0);
+    expect((await as("authenticated", C, `delete from public.review_votes where user_book_id = $1 returning 1`, [reviewA])).rows).toHaveLength(1);
+    expect(await counts(book)).toEqual([{ user_book_id: reviewA, helpful: 1 }]);
+  });
+
+  it("birlashtirishda ovozlar asosiy kitobdagi oʻsha taqriz bilan koʻchadi", async () => {
+    const [{ id: target }] = await q1<{ id: number }>(`insert into public.books (slug, title, source) values ('ovoz-asosiy', 'Ovoz', 'mutolaa') returning id`);
+    // A ning asosiy nusxasida taqriz yoʻq, takror nusxasida (book) taqriz va B ning ovozi bor
+    await q1(`insert into public.user_books (user_id, book_id, status) values ($1, $2, 'want')`, [A, target]);
+    await as("service_role", null, `select public.merge_books($1, $2)`, [target, book]);
+    const [{ id: kept }] = await q1<{ id: number }>(`select id from public.user_books where user_id = $1 and book_id = $2`, [A, target]);
+    expect(await q1(`select review from public.user_books where id = $1`, [kept])).toEqual([{ review: "Juda foydali kitob" }]);
+    expect(await counts(target)).toEqual([{ user_book_id: kept, helpful: 1 }]);
+  });
+});

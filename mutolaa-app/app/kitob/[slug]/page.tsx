@@ -219,7 +219,7 @@ async function BookView({ params }: { params: PageProps<"/kitob/[slug]">["params
       </Suspense>
 
       <Suspense fallback={null}>
-        <ReadersSection bookId={book.id} />
+        <ReadersSection bookId={book.id} slug={book.slug} />
       </Suspense>
 
       <Suspense fallback={null}>

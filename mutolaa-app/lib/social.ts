@@ -143,7 +143,15 @@ export async function getFeed(scope: "following" | "all", limit = 50): Promise<{
   return { items, now };
 }
 
-export type BookReview = { person: PublicPerson; rating: number | null; review: string | null; isSpoiler: boolean; date: string };
+export type BookReview = {
+  id: number;
+  person: PublicPerson;
+  rating: number | null;
+  review: string | null;
+  isSpoiler: boolean;
+  helpful: number;
+  date: string;
+};
 
 // Kitob sahifasi: ochiq profilli oʻquvchilar baholari va taqrizlari (anonim klient — faqat ochiq maʼlumot)
 export async function getBookReviews(bookId: number) {
@@ -151,15 +159,22 @@ export async function getBookReviews(bookId: number) {
   cacheLife("minutes");
   cacheTag(`reviews:${bookId}`);
 
-  const { data, error } = await createPublicClient()
-    .from("user_books")
-    .select("rating, review, review_is_spoiler, finished_at, updated_at, profiles!inner(id, username, display_name, avatar_url)")
+  const db = createPublicClient();
+  const [{ data, error }, { data: votes }] = await Promise.all([
+    db
+      .from("user_books")
+      .select("id, rating, review, review_is_spoiler, finished_at, updated_at, profiles!inner(id, username, display_name, avatar_url)")
     .eq("book_id", bookId)
     .or("rating.not.is.null,review.not.is.null")
-    .order("updated_at", { ascending: false })
-    .limit(50);
+      .order("updated_at", { ascending: false })
+      .limit(50),
+    // "Foydali" ovozlari soni (kim ovoz bergani oshkor qilinmaydi)
+    db.rpc("review_helpful_counts", { p_book_id: bookId }),
+  ]);
   if (error) throw new Error(`Taqrizlar: ${error.message}`);
+  const helpful = new Map(((votes ?? []) as { user_book_id: number; helpful: number }[]).map((v) => [v.user_book_id, v.helpful]));
   const rows = (data ?? []) as unknown as {
+    id: number;
     rating: number | null;
     review: string | null;
     review_is_spoiler: boolean;
@@ -171,14 +186,19 @@ export async function getBookReviews(bookId: number) {
   return {
     average: rated.length ? rated.reduce((s, r) => s + Number(r.rating), 0) / rated.length : null,
     ratingCount: rated.length,
-    reviews: rows.map(
-      (r): BookReview => ({
-        person: r.profiles,
-        rating: r.rating,
-        review: r.review,
-        isSpoiler: r.review_is_spoiler,
-        date: r.finished_at ?? r.updated_at.slice(0, 10),
-      }),
-    ),
+    // Eng foydali taqrizlar tepada; teng boʻlsa — yangilari (soʻrov tartibi saqlanadi)
+    reviews: rows
+      .map(
+        (r): BookReview => ({
+          id: r.id,
+          person: r.profiles,
+          rating: r.rating,
+          review: r.review,
+          isSpoiler: r.review_is_spoiler,
+          helpful: helpful.get(r.id) ?? 0,
+          date: r.finished_at ?? r.updated_at.slice(0, 10),
+        }),
+      )
+      .sort((a, b) => b.helpful - a.helpful),
   };
 }
