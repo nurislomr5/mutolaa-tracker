@@ -1,4 +1,5 @@
 import Link from "next/link";
+import { ReportBookIssue } from "@/components/book/report-issue";
 import { CustomShelves } from "@/components/shelf/custom-shelves";
 import { NoteForm, NoteItem } from "@/components/shelf/notes";
 import { ProgressForm, ReadingSessionList } from "@/components/shelf/progress-form";
@@ -37,6 +38,22 @@ export async function EditBookLink({ book }: { book: BookDetail }) {
       ✎ {uz.editBook.link}
     </Link>
   );
+}
+
+// "Xatoni bildirish" — faqat tizimga kirganlarga forma, mehmonga kirish havolasi
+export async function ReportIssueSlot({ book }: { book: BookDetail }) {
+  const user = await getSessionUser();
+  if (!user) {
+    return (
+      <Link
+        href={`/kirish?next=${encodeURIComponent(`/kitob/${book.slug}`)}`}
+        className="mt-4 inline-block text-xs text-muted hover:text-accent hover:underline"
+      >
+        ⚑ {uz.book.reportIssue}
+      </Link>
+    );
+  }
+  return <ReportBookIssue slug={book.slug} />;
 }
 
 // Kitob javonda boʻlsa: progress, baho, taqriz, qaydlar, maxsus javonlar

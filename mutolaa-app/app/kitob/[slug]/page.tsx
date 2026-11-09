@@ -5,7 +5,6 @@ import { Suspense } from "react";
 import { BookCover } from "@/components/book/book-cover";
 import { BookGrid } from "@/components/book/book-card";
 import { FormatIcon } from "@/components/book/format-icons";
-import { ReportBookIssue } from "@/components/book/report-issue";
 import { SOURCE_NAMES, WhereToGet } from "@/components/book/where-to-get";
 import { Badge } from "@/components/ui/badge";
 import { buttonClasses } from "@/components/ui/button";
@@ -15,7 +14,7 @@ import { bookDescription, bookJsonLd } from "@/lib/seo";
 import { formatCount, formatDuration, formatRating } from "@/lib/format";
 import { uz } from "@/lib/i18n/uz";
 import { ReadersSection } from "./readers";
-import { EditBookLink, MyBookSection, ShelfActions } from "./shelf-panel";
+import { EditBookLink, MyBookSection, ReportIssueSlot, ShelfActions } from "./shelf-panel";
 
 // Eng mashhur kitoblar build paytida tayyorlanadi, qolganlari birinchi tashrifda keshlanadi
 export async function generateStaticParams() {
@@ -200,7 +199,9 @@ async function BookView({ params }: { params: PageProps<"/kitob/[slug]">["params
           {book.sources.length > 0 && (
             <p className="mt-8 text-xs text-muted">{t.source([...new Set(book.sources.map((s) => SOURCE_NAMES[s.source]))].join(", "))}</p>
           )}
-          <ReportBookIssue slug={book.slug} title={book.title} />
+          <Suspense fallback={null}>
+            <ReportIssueSlot book={book} />
+          </Suspense>
         </div>
       </div>
 

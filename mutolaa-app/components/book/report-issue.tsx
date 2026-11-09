@@ -6,7 +6,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { uz } from "@/lib/i18n/uz";
 
-export function ReportBookIssue({ slug, title }: { slug: string; title: string }) {
+export function ReportBookIssue({ slug }: { slug: string }) {
   const [open, setOpen] = useState(false);
   const [state, action, pending] = useActionState(reportBookIssue, null);
   const t = uz.book;
@@ -23,7 +23,6 @@ export function ReportBookIssue({ slug, title }: { slug: string; title: string }
       {open && (
         <form action={action} className="mt-2 flex flex-wrap gap-2">
           <input type="hidden" name="slug" value={slug} />
-          <input type="hidden" name="title" value={title} />
           <Input
             name="message"
             required

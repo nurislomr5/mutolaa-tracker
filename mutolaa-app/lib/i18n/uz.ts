@@ -138,6 +138,8 @@ export const uz = {
     reportSubmit: "Yuborish",
     reportSend: "Yuborish",
     reportSent: "✓ Xabaringiz adminga yuborildi. Rahmat!",
+    reportLogin: "Xato haqida xabar berish uchun tizimga kiring.",
+    reportLimit: "Bir soatda koʻp xabar yubordingiz. Birozdan soʻng qayta urinib koʻring.",
   },
   author: {
     books: (n: number) => `${n} ta kitob`,
