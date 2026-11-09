@@ -3,7 +3,7 @@
 -- hisoblagich ishonchsiz: har soʻrov boshqa nusxaga tushishi mumkin). Faqat service role yozadi/oʻqiydi
 -- (app/actions/report-book.ts), shuning uchun foydalanuvchi rollariga hech qanday huquq berilmaydi.
 
-create table public.book_reports (
+create table if not exists public.book_reports (
   id bigint generated always as identity primary key,
   user_id uuid not null references auth.users (id) on delete cascade,
   book_id bigint not null references public.books (id) on delete cascade,
@@ -11,8 +11,8 @@ create table public.book_reports (
   created_at timestamptz not null default now()
 );
 
-create index book_reports_user_created_idx on public.book_reports (user_id, created_at desc);
-create index book_reports_book_idx on public.book_reports (book_id);
+create index if not exists book_reports_user_created_idx on public.book_reports (user_id, created_at desc);
+create index if not exists book_reports_book_idx on public.book_reports (book_id);
 
 alter table public.book_reports enable row level security;
 revoke all on public.book_reports from anon, authenticated;
