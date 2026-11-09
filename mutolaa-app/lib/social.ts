@@ -163,7 +163,10 @@ export async function getBookReviews(bookId: number) {
   const [{ data, error }, { data: votes }] = await Promise.all([
     db
       .from("user_books")
-      .select("id, rating, review, review_is_spoiler, finished_at, updated_at, profiles!inner(id, username, display_name, avatar_url)")
+      // review_votes ham user_books va profiles ni bogʻlaydi — taqriz muallifi bogʻlanishi aniq nomi bilan
+      .select(
+        "id, rating, review, review_is_spoiler, finished_at, updated_at, profiles!user_books_profile_fkey!inner(id, username, display_name, avatar_url)",
+      )
     .eq("book_id", bookId)
     .or("rating.not.is.null,review.not.is.null")
       .order("updated_at", { ascending: false })
