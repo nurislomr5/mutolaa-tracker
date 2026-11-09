@@ -3,7 +3,7 @@
  * Har bir kitob mavjud asar bilan (ISBN yoki "nom + muallif" boʻyicha) birlashtiriladi yoki yangi asar yaratiladi;
  * nashr maʼlumoti (narx, betlar soni, nashriyot, ISBN) book_sources jadvaliga yoziladi.
  *
- *   npm run import:asaxiy                         # yangi va 7 kundan eski yozuvlar
+ *   npm run import:asaxiy                         # yangi va 6 kundan eski yozuvlar
  *   npm run import:asaxiy -- --pages 2 --dry-run  # 2 ta roʻyxat sahifasi, bazaga yozmasdan
  *   npm run import:asaxiy -- --limit 50           # faqat 50 ta kitob
  *   npm run import:asaxiy -- --slug barbara-oukli-raqamlar-uchun-yaralgan-idrok
@@ -19,7 +19,8 @@ loadEnv();
 const BASE = "https://asaxiy.uz";
 const CONCURRENCY = 2;
 const DELAY_MS = 1000;
-const FRESH_DAYS = 7;
+// Haftalik importda oʻtgan haftaning yozuvlari ham qayta yangilansin (7 boʻlsa, oʻtgan safar kechroq ishlanganlari "yangi" hisoblanib oʻtkazib yuboriladi)
+const FRESH_DAYS = 6;
 
 const cli = cliArgs();
 const DRY_RUN = cli.flag("dry-run");

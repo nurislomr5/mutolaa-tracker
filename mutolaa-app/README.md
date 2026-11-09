@@ -1,36 +1,86 @@
-This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://nextjs.org/docs/app/api-reference/cli/create-next-app).
+# Sahifa
 
-## Getting Started
+Oʻzbek tilidagi kitobxonlik kuzatuvchisi: oʻqigan, oʻqiyotgan va oʻqimoqchi boʻlgan kitoblar, progress, qaydlar, statistika, obunalar, klublar va Telegram bot.
 
-First, run the development server:
+- Sayt: https://mutolaa-tracker.vercel.app
+- Bot: [@mutolaa_tracker_bot](https://t.me/mutolaa_tracker_bot)
+- Texnologiya: Next.js 16 (App Router, `cacheComponents`), Supabase (Postgres + Auth + Storage), Tailwind 4, Vercel
+
+> Next.js 16'da API'lar oldingi versiyalardan farq qiladi. Kod yozishdan oldin `node_modules/next/dist/docs/` dagi qoʻllanmaga qarang (qarang: `AGENTS.md`).
+
+## Katalog
+
+Kitoblar uchta manbadan import qilinadi (faqat metamaʼlumot, manbaga havola bilan):
+
+| Manba | Nima beradi | Buyruq |
+| --- | --- | --- |
+| Mutolaa (mutolaa.com) | audio va elektron kitoblar | `npm run import:mutolaa` |
+| Asaxiy | qogʻoz kitoblar, narx, sotuvda borligi | `npm run import:asaxiy` |
+| Hilol Nashr (hilolnashr.uz) | qogʻoz kitoblar, narx, sotuvda borligi | `npm run import:hilol` |
+
+Bir asarning turli nashrlari `book_sources` jadvalida bitta kitobga birlashtiriladi (ISBN yoki "nom + muallif" boʻyicha). Foydalanuvchilar ham katalogda yoʻq kitobni qoʻsha oladi (`/kitob-qoshish`). Takroriy kitoblar `/admin/takrorlar` da birlashtiriladi.
+
+Importerlar `--dry-run` (bazaga yozmasdan), `--limit N` va `--force` (hammasini qayta yuklash) bayroqlarini qabul qiladi.
+
+## Ishga tushirish
 
 ```bash
+npm install
 npm run dev
-# or
-yarn dev
-# or
-pnpm dev
-# or
-bun dev
 ```
 
-Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
+`.env.local` faylida kerakli oʻzgaruvchilar:
 
-You can start editing the page by modifying `app/page.tsx`. The page auto-updates as you edit the file.
+| Oʻzgaruvchi | Vazifasi |
+| --- | --- |
+| `NEXT_PUBLIC_SUPABASE_URL`, `NEXT_PUBLIC_SUPABASE_ANON_KEY` | Supabase loyihasi |
+| `SUPABASE_SERVICE_ROLE_KEY` | server amallari va importerlar (maxfiy) |
+| `NEXT_PUBLIC_APP_URL` | saytning toʻliq manzili (SEO, bot havolalari) |
+| `TELEGRAM_BOT_TOKEN`, `TELEGRAM_WEBHOOK_SECRET` | Telegram bot |
+| `MY_TELEGRAM_ID` | admin Telegram ID |
+| `ALERT_TELEGRAM_CHAT_ID` | xatolar haqida ogohlantirish chati (ixtiyoriy) |
+| `CRON_SECRET` | `/api/cron/reminders` himoyasi |
+| `GEMINI_API_KEY` | botdagi AI javoblar |
 
-This project uses [`next/font`](https://nextjs.org/docs/app/building-your-application/optimizing/fonts) to automatically optimize and load [Geist](https://vercel.com/font), a new font family for Vercel.
+Diqqat: Windows'da eski tizim oʻzgaruvchilari `.env.local` ni bosib ketishi mumkin. Build xato bersa, ularni oʻchirib ishga tushiring:
 
-## Learn More
+```bash
+env -u NEXT_PUBLIC_SUPABASE_URL -u NEXT_PUBLIC_SUPABASE_ANON_KEY -u SUPABASE_SERVICE_ROLE_KEY npm run build
+```
 
-To learn more about Next.js, take a look at the following resources:
+## Tekshiruvlar
 
-- [Next.js Documentation](https://nextjs.org/docs) - learn about Next.js features and API.
-- [Learn Next.js](https://nextjs.org/learn) - an interactive Next.js tutorial.
+```bash
+npm test          # vitest (jumladan PGlite'da barcha migratsiyalar va RLS testlari)
+npm run typecheck
+npm run lint
+npm run build
+```
 
-You can check out [the Next.js GitHub repository](https://github.com/vercel/next.js) - your feedback and contributions are welcome!
+CI (`.github/workflows/ci.yml`) har push'da lint, typecheck va testlarni ishga tushiradi.
 
-## Deploy on Vercel
+## Baza
 
-The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
+Migratsiyalar: `supabase/migrations/`. Ular prod bazaga Supabase SQL Editor orqali qoʻlda qoʻllanadi — **kod deploy qilinishidan oldin**, aks holda yangi kod mavjud boʻlmagan ustun yoki funksiyani soʻrab buziladi.
 
-Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/building-your-application/deploying) for more details.
+- Har bir yangi migratsiya `tests/db-access.test.ts` da sinaladi (rollar va ruxsatlar Supabase'ga oʻxshatilgan).
+- PGlite superuser sifatida ishlaydi: SQL Editor'da ruxsat berilmaydigan buyruqlarni qoʻlda tekshiring.
+- Bir-biriga bogʻlangan ikki jadvalni yana bogʻlaydigan jadval qoʻshilsa, PostgREST embed'lari noaniq boʻlib qoladi (PGRST201) — kodda aniq FK nomini yozing (`profiles!user_books_profile_fkey`).
+- Supabase yangi funksiyalarni `anon` ga avtomatik ochadi — faqat kirganlar uchun boʻlganlarida `revoke` ni aniq yozing.
+
+## Avtomatlashtirish (GitHub Actions)
+
+| Workflow | Qachon | Nima qiladi |
+| --- | --- | --- |
+| `import-mutolaa.yml` | har dushanba 02:00 UTC | Mutolaa, Asaxiy va Hilol katalogini yangilaydi |
+| `reminders.yml` | har soat | Telegram eslatmalari (`/api/cron/reminders`) |
+| `ci.yml` | har push | lint, typecheck, testlar |
+
+Kerakli secrets: `NEXT_PUBLIC_SUPABASE_URL`, `SUPABASE_SERVICE_ROLE_KEY`, `CRON_SECRET`, ixtiyoriy `TELEGRAM_BOT_TOKEN` va `ALERT_TELEGRAM_CHAT_ID` (yiqilganda Telegram'ga xabar).
+
+## Boshqa buyruqlar
+
+- `npm run bot:setup` — webhook, buyruqlar menyusi va Mini App tugmasini oʻrnatadi (bot buyruqlari oʻzgarganda qayta ishga tushiring)
+- `npm run storage:setup` — muqovalar uchun `covers` bucket
+- `npm run publishers:merge` — nashriyot nomlarini birlashtirish (`lib/publishers.ts`)
+- `npm run icons` — PWA ikonkalari

@@ -4,7 +4,7 @@
  * nashr maʼlumoti (narx, sotuvda borligi, betlar soni, nashriyot, ISBN) book_sources jadvaliga (source = 'hilol') yoziladi.
  * Jurnallar va ISBN ham, muallif ham koʻrsatilmagan mahsulotlar (disk, plakat…) oʻtkazib yuboriladi.
  *
- *   npm run import:hilol                          # yangi va 7 kundan eski yozuvlar
+ *   npm run import:hilol                          # yangi va 6 kundan eski yozuvlar
  *   npm run import:hilol -- --dry-run             # bazaga yozmasdan: nima qoʻshilishi/birlashishini koʻrsatadi
  *   npm run import:hilol -- --dry-run --limit 20  # faqat 20 ta kitob
  *   npm run import:hilol -- --slug Xayola-hn      # bitta kitob
@@ -21,7 +21,8 @@ const BASE = "https://hilolnashr.uz";
 const CATEGORY = `${BASE}/hilol-nashr`;
 const CONCURRENCY = 2;
 const DELAY_MS = 1000;
-const FRESH_DAYS = 7;
+// Haftalik importda oʻtgan haftaning yozuvlari ham qayta yangilansin (7 boʻlsa, oʻtgan safar kechroq ishlanganlari "yangi" hisoblanib oʻtkazib yuboriladi)
+const FRESH_DAYS = 6;
 
 const cli = cliArgs();
 const DRY_RUN = cli.flag("dry-run");

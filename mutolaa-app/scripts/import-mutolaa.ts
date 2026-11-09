@@ -2,7 +2,7 @@
  * Mutolaa katalogini (faqat metamaʼlumot: nom, muallif, muqova, rukn, davomiylik) Supabase'ga import qilish.
  * Kitob matni yoki audiosi koʻchirilmaydi — har bir kitob Mutolaa sahifasiga havola qiladi.
  *
- *   npm run import:mutolaa                     # yangi va 7 kundan eski yozuvlarni yangilaydi
+ *   npm run import:mutolaa                     # yangi va 6 kundan eski yozuvlarni yangilaydi
  *   npm run import:mutolaa -- --limit 20       # faqat birinchi 20 ta kitob
  *   npm run import:mutolaa -- --dry-run        # bazaga yozmaydi, natijani ekranga chiqaradi
  *   npm run import:mutolaa -- --force          # hammasini qayta yuklaydi
@@ -21,7 +21,8 @@ const USER_AGENT = "SahifaCatalogBot/1.0 (Uzbek book tracker; metadata only)";
 const CONCURRENCY = 2;
 const DELAY_MS = 1000;
 const FLUSH_EVERY = 50;
-const FRESH_DAYS = 7;
+// Haftalik importda oʻtgan haftaning yozuvlari ham qayta yangilansin (7 boʻlsa, oʻtgan safar kechroq ishlanganlari "yangi" hisoblanib oʻtkazib yuboriladi)
+const FRESH_DAYS = 6;
 
 // ---------- CLI ----------
 const args = process.argv.slice(2);
