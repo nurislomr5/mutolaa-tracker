@@ -211,3 +211,119 @@ describe("migratsiyalar va ruxsatlar", () => {
     await expectDenied("anon", null, `select reminder_hour from public.profiles`);
   });
 });
+
+describe("20261109000009: katalog filtrlari va yillik statistika", () => {
+  const ids: Record<string, number> = {};
+
+  beforeAll(async () => {
+    await db.exec(`
+      insert into public.publishers (name, slug) values ('Alfa', 'alfa'), ('Beta', 'beta');
+      insert into public.books (slug, title, source, formats, mutolaa_reading_count, publisher_id) values
+        ('filtr-bir', 'Filtr bir', 'mutolaa', '{audio}', 300, null),
+        ('filtr-ikki', 'Filtr ikki', 'asaxiy', '{paper}', 200, (select id from public.publishers where slug = 'alfa')),
+        ('filtr-uch', 'Filtr uch', 'asaxiy', '{paper}', 100, (select id from public.publishers where slug = 'alfa'));
+    `);
+    for (const r of (await db.query<{ id: number; slug: string }>(`select id, slug from public.books where slug like 'filtr-%'`)).rows) ids[r.slug] = r.id;
+    // filtr-uch ning asosiy nashriyoti Alfa, lekin Beta'da ham ruscha nashri bor (sotuvda)
+    await db.query(
+      `insert into public.book_sources (book_id, source, external_id, url, publisher_id, language, in_stock) values
+         ($1, 'mutolaa', 'm1', 'https://m/1', null, null, null),
+         ($2, 'asaxiy', 'a2', 'https://a/2', (select id from public.publishers where slug = 'alfa'), 'o''zb/rus', false),
+         ($3, 'asaxiy', 'a3', 'https://a/3', (select id from public.publishers where slug = 'alfa'), 'uz', false),
+         ($3, 'asaxiy', 'a4', 'https://a/4', (select id from public.publishers where slug = 'beta'), 'ru', true)`,
+      [ids["filtr-bir"], ids["filtr-ikki"], ids["filtr-uch"]],
+    );
+  });
+
+  it("til yozuvlari toifalarga ajraladi", async () => {
+    const cases: [string, string | null, string[]][] = [
+      ["mutolaa", null, ["uz"]],
+      ["asaxiy", null, []],
+      ["asaxiy", "uz", ["uz"]],
+      ["asaxiy", "o'zb/rus", ["ru", "uz"]],
+      ["asaxiy", "узб/рус/англ", ["en", "ru", "uz"]],
+      ["asaxiy", "uzb/english", ["en", "uz"]],
+      ["asaxiy", "ingliz / o‘zbek", ["en", "uz"]],
+      ["asaxiy", "o'zbekcha / yaponcha", ["other", "uz"]],
+      ["asaxiy", "английский/русский", ["en", "ru"]],
+      ["asaxiy", "kaa", ["other"]],
+      ["asaxiy", "tr", ["other"]],
+      ["asaxiy", "rus", ["ru"]],
+    ];
+    for (const [source, language, expected] of cases) {
+      const { rows } = await db.query<{ l: string[] }>(`select public.source_langs($1, $2) as l`, [source, language]);
+      expect(rows[0].l, `${source}: ${language}`).toEqual(expected);
+    }
+  });
+
+  const slugs = async (sql: string, params: unknown[] = []) =>
+    (await as("anon", null, `select slug from ${sql}`, params)).rows.map((r) => r.slug);
+
+  it("search_catalog: filtrsiz — search_books bilan bir xil tartib (mashhurlik)", async () => {
+    expect(await slugs(`public.search_catalog('filtr')`)).toEqual(["filtr-bir", "filtr-ikki", "filtr-uch"]);
+    expect(await slugs(`public.search_books('filtr')`)).toEqual(["filtr-bir", "filtr-ikki", "filtr-uch"]);
+  });
+
+  it("search_catalog: nashriyot — kitobning oʻzi yoki nashri orqali", async () => {
+    expect(await slugs(`public.search_catalog('filtr', 'alfa')`)).toEqual(["filtr-ikki", "filtr-uch"]);
+    expect(await slugs(`public.search_catalog('filtr', 'beta')`)).toEqual(["filtr-uch"]);
+    expect(await slugs(`public.search_catalog('filtr', 'yoq')`)).toEqual([]);
+  });
+
+  it("search_catalog: til va sotuvda bor (bitta nashr boʻyicha)", async () => {
+    expect(await slugs(`public.search_catalog('filtr', null, 'uz')`)).toEqual(["filtr-bir", "filtr-ikki", "filtr-uch"]);
+    expect(await slugs(`public.search_catalog('filtr', null, 'ru')`)).toEqual(["filtr-ikki", "filtr-uch"]);
+    expect(await slugs(`public.search_catalog('filtr', null, 'en')`)).toEqual([]);
+    expect(await slugs(`public.search_catalog('filtr', null, null, true)`)).toEqual(["filtr-uch"]);
+    // filtr-ikki ruscha, lekin sotuvda emas; filtr-uch ning oʻzbekcha nashri sotuvda emas
+    expect(await slugs(`public.search_catalog('filtr', null, 'ru', true)`)).toEqual(["filtr-uch"]);
+    expect(await slugs(`public.search_catalog('filtr', null, 'uz', true)`)).toEqual([]);
+    expect(await slugs(`public.search_catalog('filtr', 'alfa', 'ru', true)`)).toEqual(["filtr-uch"]);
+  });
+
+  it("publisher_book_counts: takrorsiz sanaydi", async () => {
+    const { rows } = await as("anon", null, `select slug, count::int as n from public.publisher_book_counts() where slug in ('alfa', 'beta') order by slug`);
+    expect(rows).toEqual([
+      { slug: "alfa", n: 2 },
+      { slug: "beta", n: 1 },
+    ]);
+  });
+
+  it("get_user_year_stats: Toshkent vaqti boʻyicha kunlar, betlar va daqiqalar; faqat oʻziniki", async () => {
+    const year = Number(new Date().toLocaleDateString("en-CA", { timeZone: "Asia/Tashkent" }).slice(0, 4));
+    const pagesUb = (await db.query<{ id: number }>(`select id from public.user_books where user_id = $1 limit 1`, [A])).rows[0].id;
+    await db.query(`update public.user_books set unit = 'pages' where id = $1`, [pagesUb]);
+    const audioUb = (
+      await db.query<{ id: number }>(`insert into public.user_books (user_id, book_id, status, unit) values ($1, $2, 'reading', 'minutes') returning id`, [A, ids["filtr-bir"]])
+    ).rows[0].id;
+    await db.query(
+      `insert into public.reading_sessions (user_id, user_book_id, delta, new_value, source, created_at) values
+         ($1, $2, 20, 20, 'web', $4),   -- UTC 20:00 → Toshkentda ertasi kun
+         ($1, $2, 10, 30, 'web', $5),
+         ($1, $2, -5, 25, 'web', $5),   -- manfiy (orqaga) hisoblanmaydi
+         ($1, $3, 45, 45, 'web', $5),
+         ($1, $2, 99, 99, 'web', $6)    -- oʻtgan yil: bu yil statistikasiga kirmaydi`,
+      [A, pagesUb, audioUb, `${year}-03-01T20:00:00Z`, `${year}-03-02T08:00:00Z`, `${year - 1}-06-01T08:00:00Z`],
+    );
+
+    const { rows } = await as("authenticated", A, `select public.get_user_year_stats($1) as s`, [year]);
+    const s = rows[0].s as { activity: Record<string, number>; pages: number; minutes: number };
+    expect(s.activity[`${year}-03-02`]).toBe(3);
+    expect(s.activity[`${year}-03-01`]).toBeUndefined();
+    expect(s.pages).toBe(30);
+    expect(s.minutes).toBe(45);
+
+    const past = (await as("authenticated", A, `select public.get_user_year_stats($1) as s`, [year - 1])).rows[0].s as typeof s;
+    expect(past).toEqual({ activity: { [`${year - 1}-06-01`]: 1 }, pages: 99, minutes: 0 });
+
+    const other = (await as("authenticated", B, `select public.get_user_year_stats($1) as s`, [year])).rows[0].s;
+    expect(other).toEqual({ activity: {}, pages: 0, minutes: 0 });
+    await expectDenied("anon", null, `select public.get_user_year_stats($1)`, [year]);
+  });
+
+  it("009 qayta ishga tushirilsa ham xato bermaydi", async () => {
+    const f = fs.readdirSync(MIGRATIONS).find((f) => f.endsWith("_catalog_filters_year_stats.sql"))!;
+    await db.exec(fs.readFileSync(path.join(MIGRATIONS, f), "utf8"));
+    expect(await slugs(`public.search_catalog('filtr', 'beta')`)).toEqual(["filtr-uch"]);
+  });
+});

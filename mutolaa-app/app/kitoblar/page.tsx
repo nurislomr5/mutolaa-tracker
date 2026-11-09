@@ -13,6 +13,7 @@ import {
   getTopics,
   PAGE_SIZE,
   type BookFormat,
+  type BookLang,
   type BookScript,
   type BookSize,
   type CatalogQuery,
@@ -31,6 +32,7 @@ const SORTS: CatalogSort[] = ["relevance", "popular", "rating", "new", "title"];
 const FORMATS: BookFormat[] = ["paper", "ebook", "audio"];
 const SCRIPTS: BookScript[] = ["latin", "cyrillic"];
 const SIZES: BookSize[] = ["short", "medium", "long"];
+const LANGS: BookLang[] = ["uz", "ru", "en", "other"];
 
 type SearchParams = Record<string, string | string[] | undefined>;
 
@@ -41,6 +43,7 @@ function parseQuery(sp: SearchParams): CatalogQuery {
   const format = one("format");
   const script = one("yozuv");
   const size = one("hajm");
+  const lang = one("til");
   const sort = one("sort");
   const page = Number(one("sahifa") ?? 1);
   return {
@@ -50,6 +53,8 @@ function parseQuery(sp: SearchParams): CatalogQuery {
     format: FORMATS.includes(format as BookFormat) ? (format as BookFormat) : undefined,
     script: SCRIPTS.includes(script as BookScript) ? (script as BookScript) : undefined,
     size: SIZES.includes(size as BookSize) ? (size as BookSize) : undefined,
+    lang: LANGS.includes(lang as BookLang) ? (lang as BookLang) : undefined,
+    inStock: one("sotuvda") === "1" || undefined,
     sort: SORTS.includes(sort as CatalogSort) ? (sort as CatalogSort) : undefined,
     page: Number.isInteger(page) && page >= 1 && page <= 1000 ? page : 1,
   };
@@ -65,6 +70,8 @@ function catalogHref(q: CatalogQuery, patch: Partial<CatalogQuery>) {
   if (next.format) params.set("format", next.format);
   if (next.script) params.set("yozuv", next.script);
   if (next.size) params.set("hajm", next.size);
+  if (next.lang) params.set("til", next.lang);
+  if (next.inStock) params.set("sotuvda", "1");
   if (next.sort) params.set("sort", next.sort);
   if (next.page && next.page > 1) params.set("sahifa", String(next.page));
   const s = params.toString();
@@ -94,7 +101,9 @@ async function Catalog({ searchParams }: { searchParams: Promise<SearchParams> }
   ]);
   const pages = Math.max(1, Math.ceil(total / PAGE_SIZE));
   const page = query.page ?? 1;
-  const hasFilters = Boolean(query.q || query.topic || query.publisher || query.format || query.script || query.size || query.sort);
+  const hasFilters = Boolean(
+    query.q || query.topic || query.publisher || query.format || query.script || query.size || query.lang || query.inStock || query.sort,
+  );
   const t = uz.catalog;
 
   return (
@@ -105,6 +114,8 @@ async function Catalog({ searchParams }: { searchParams: Promise<SearchParams> }
         {query.format && <input type="hidden" name="format" value={query.format} />}
         {query.script && <input type="hidden" name="yozuv" value={query.script} />}
         {query.size && <input type="hidden" name="hajm" value={query.size} />}
+        {query.lang && <input type="hidden" name="til" value={query.lang} />}
+        {query.inStock && <input type="hidden" name="sotuvda" value="1" />}
         {query.publisher && <input type="hidden" name="nashriyot" value={query.publisher} />}
         <select
           name="sort"
@@ -153,6 +164,16 @@ async function Catalog({ searchParams }: { searchParams: Promise<SearchParams> }
             {t.size[sz]}
           </Chip>
         ))}
+        <span className="mx-1 hidden h-4 w-px bg-border sm:inline-block" aria-hidden />
+        {LANGS.map((l) => (
+          <Chip key={l} href={catalogHref(query, { lang: query.lang === l ? undefined : l })} active={query.lang === l}>
+            {t.lang[l]}
+          </Chip>
+        ))}
+        <span className="mx-1 hidden h-4 w-px bg-border sm:inline-block" aria-hidden />
+        <Chip href={catalogHref(query, { inStock: query.inStock ? undefined : true })} active={Boolean(query.inStock)}>
+          {t.inStock}
+        </Chip>
       </div>
 
       <div className="-mx-4 mt-3 flex gap-2 overflow-x-auto px-4 pb-1 sm:mx-0 sm:flex-wrap sm:px-0">

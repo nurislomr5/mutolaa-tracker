@@ -67,6 +67,8 @@ export type Topic = { name: string; slug: string; color: string | null; count: n
 export type CatalogSort = "relevance" | "popular" | "rating" | "new" | "title";
 export type BookScript = "latin" | "cyrillic";
 export type BookSize = "short" | "medium" | "long";
+// Nashr tili (book_sources.langs): Mutolaa — oʻzbekcha, Asaxiy yozuvlari uz/ru/en/other ga ajratiladi
+export type BookLang = "uz" | "ru" | "en" | "other";
 
 export type CatalogQuery = {
   q?: string;
@@ -75,6 +77,8 @@ export type CatalogQuery = {
   format?: BookFormat;
   script?: BookScript;
   size?: BookSize;
+  lang?: BookLang;
+  inStock?: boolean;
   sort?: CatalogSort;
   page?: number;
 };
@@ -83,7 +87,7 @@ function fail(what: string, message: string): never {
   throw new Error(`${what}: ${message}`);
 }
 
-export async function getCatalog({ q = "", topic, publisher, format, script, size, sort, page = 1 }: CatalogQuery) {
+export async function getCatalog({ q = "", topic, publisher, format, script, size, lang, inStock, sort, page = 1 }: CatalogQuery) {
   "use cache";
   cacheLife("hours");
   cacheTag("catalog");
@@ -93,11 +97,12 @@ export async function getCatalog({ q = "", topic, publisher, format, script, siz
   const sortColumns = `${CARD_COLUMNS}, mutolaa_rating_count, mutolaa_reading_count, search_text, first_seen_at, published_year`;
   let columns = sortColumns;
   if (topic) columns += ", book_topics!inner(topics!inner(slug))";
-  if (publisher) columns += ", publishers!inner(slug)";
-  let query = db.rpc("search_books", { q }, { count: "exact" }).select(columns);
+  // nashriyot, til va "sotuvda bor" — search_catalog ichida (nashriyot kitobning nashrlari orqali ham)
+  let query = db
+    .rpc("search_catalog", { q, p_publisher: publisher ?? null, p_lang: lang ?? null, p_in_stock: Boolean(inStock) }, { count: "exact" })
+    .select(columns);
 
   if (topic) query = query.eq("book_topics.topics.slug", topic);
-  if (publisher) query = query.eq("publishers.slug", publisher);
   if (format) query = query.contains("formats", [format]);
   if (script) query = query.eq("script", script);
   if (size === "short") query = query.gt("page_count", 0).lt("page_count", 200);
@@ -123,9 +128,8 @@ export async function getCatalog({ q = "", topic, publisher, format, script, siz
   // sahifa raqami juda katta boʻlsa PostgREST 416 qaytaradi — boʻsh natija sifatida koʻrsatamiz
   if (error && error.code !== "PGRST103") fail("Katalog", error.message);
   // filtr uchun qoʻshilgan bogʻlanish ustunlarini kartochkaga uzatmaymiz
-  const books = ((data ?? []) as unknown as (BookCardData & { book_topics?: unknown; publishers?: unknown })[]).map((b) => {
+  const books = ((data ?? []) as unknown as (BookCardData & { book_topics?: unknown })[]).map((b) => {
     delete b.book_topics;
-    delete b.publishers;
     return b as BookCardData;
   });
   return { books, total: count ?? 0 };
@@ -249,12 +253,13 @@ export async function getPublishers() {
   cacheLife("hours");
   cacheTag("catalog");
 
-  const { data, error } = await createPublicClient().from("publishers").select("name, slug, books(count)").order("name");
+  // kitoblar soni nashrlar (book_sources) orqali bogʻlanganlari bilan birga, takrorsiz
+  const { data, error } = await createPublicClient().rpc("publisher_book_counts");
   if (error) fail("Nashriyotlar", error.message);
-  return ((data ?? []) as unknown as { name: string; slug: string; books: { count: number }[] }[])
-    .map((p): Publisher => ({ name: p.name, slug: p.slug, count: p.books[0]?.count ?? 0 }))
+  return ((data ?? []) as { name: string; slug: string; count: number | string }[])
+    .map((p): Publisher => ({ name: p.name, slug: p.slug, count: Number(p.count) }))
     .filter((p) => p.count > 0)
-    .sort((a, b) => b.count - a.count);
+    .sort((a, b) => b.count - a.count || a.name.localeCompare(b.name));
 }
 
 export async function getPublisher(slug: string) {

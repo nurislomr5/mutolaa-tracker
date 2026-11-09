@@ -1,7 +1,7 @@
 import type { BookCardData } from "@/lib/catalog";
-import type { ProgressUnit, ReadingFormat, ShelfStatus } from "@/lib/shelf-types";
+import type { ReadingFormat, ShelfStatus } from "@/lib/shelf-types";
 import { todayInTashkent } from "@/lib/shelf-types";
-import { addDays, computeStreaks, dayKey, isLeapYear } from "@/lib/stats-utils";
+import { computeStreaks, isLeapYear } from "@/lib/stats-utils";
 import { createServerSupabase, getSessionUser } from "@/lib/supabase/server";
 
 // Foydalanuvchining yillik statistikasi. Hisob-kitob serverda, Toshkent vaqti boʻyicha.
@@ -15,7 +15,9 @@ type BookRow = {
   books: BookCardData & { book_topics: { topics: { name: string; slug: string } }[] };
 };
 
-type SessionRow = { delta: number; created_at: string; user_books: { unit: ProgressUnit } };
+// get_user_year_stats (20261109000009): sessiyalar bazada Toshkent kunlariga yigʻiladi.
+// activity joriy yilda streak uchun oxirgi 400 kunni ham oʻz ichiga oladi.
+type DbYearStats = { activity: Record<string, number>; pages: number; minutes: number };
 
 export type YearStats = {
   year: number;
@@ -36,24 +38,6 @@ export type YearStats = {
   byTopic: { name: string; slug: string; count: number }[];
 };
 
-async function fetchSessions(supabase: Awaited<ReturnType<typeof createServerSupabase>>, from: string, to: string) {
-  const rows: SessionRow[] = [];
-  for (let offset = 0; ; offset += 1000) {
-    const { data, error } = await supabase
-      .from("reading_sessions")
-      .select("delta, created_at, user_books!inner(unit)")
-      .gt("delta", 0)
-      .gte("created_at", from)
-      .lt("created_at", to)
-      .order("created_at")
-      .range(offset, offset + 999);
-    if (error) throw new Error(`Sessiyalar: ${error.message}`);
-    rows.push(...((data ?? []) as unknown as SessionRow[]));
-    if (!data || data.length < 1000) break;
-  }
-  return rows;
-}
-
 export async function getYearStats(requestedYear?: number): Promise<YearStats> {
   const user = await getSessionUser();
   if (!user) throw new Error("Kirish talab qilinadi");
@@ -62,11 +46,7 @@ export async function getYearStats(requestedYear?: number): Promise<YearStats> {
   const currentYear = Number(today.slice(0, 4));
   const year = requestedYear && requestedYear >= 2000 && requestedYear <= currentYear ? requestedYear : currentYear;
 
-  // Yil chegaralari Toshkent vaqtida (UTC+5)
-  const from = `${year}-01-01T00:00:00+05:00`;
-  const to = `${year + 1}-01-01T00:00:00+05:00`;
-
-  const [{ data: books, error }, { data: profile }, sessions, streakSessions] = await Promise.all([
+  const [{ data: books, error }, { data: profile }, { data: dbStats, error: statsError }] = await Promise.all([
     supabase
       .from("user_books")
       .select(
@@ -74,11 +54,10 @@ export async function getYearStats(requestedYear?: number): Promise<YearStats> {
       )
       .eq("user_id", user.id),
     supabase.from("profiles").select("yearly_goal").eq("id", user.id).maybeSingle(),
-    fetchSessions(supabase, from, to),
-    // joriy streak yil boshidan oʻtib ketishi mumkin — oxirgi 400 kunni alohida olamiz
-    year === currentYear ? fetchSessions(supabase, `${addDays(today, -400)}T00:00:00+05:00`, to) : Promise.resolve(null),
+    supabase.rpc("get_user_year_stats", { p_year: year }),
   ]);
   if (error) throw new Error(`Javon: ${error.message}`);
+  if (statsError) throw new Error(`Sessiyalar: ${statsError.message}`);
   const rows = (books ?? []) as unknown as BookRow[];
 
   const finishedRows = rows
@@ -88,17 +67,10 @@ export async function getYearStats(requestedYear?: number): Promise<YearStats> {
   const monthly = Array.from({ length: 12 }, () => 0);
   for (const r of finishedRows) monthly[Number(r.finished_at!.slice(5, 7)) - 1]++;
 
-  const activity: Record<string, number> = {};
-  let pages = 0;
-  let minutes = 0;
-  for (const s of sessions) {
-    const d = dayKey(s.created_at);
-    activity[d] = (activity[d] ?? 0) + 1;
-    if (s.user_books.unit === "pages") pages += s.delta;
-    if (s.user_books.unit === "minutes") minutes += s.delta;
-  }
+  const { activity: allActivity, pages, minutes } = dbStats as DbYearStats;
+  const activity = Object.fromEntries(Object.entries(allActivity).filter(([d]) => d.startsWith(`${year}-`)));
   const yearDays = new Set(Object.keys(activity));
-  const allDays = streakSessions ? new Set(streakSessions.map((s) => dayKey(s.created_at))) : yearDays;
+  const allDays = new Set(Object.keys(allActivity));
   const streaks = computeStreaks(allDays, today);
   const streak = {
     current: year === currentYear ? streaks.current : 0,

@@ -90,6 +90,13 @@ export const uz = {
       medium: "200–400 bet",
       long: "400+ bet",
     },
+    lang: {
+      uz: "Oʻzbekcha",
+      ru: "Ruscha",
+      en: "Inglizcha",
+      other: "Boshqa tillar",
+    },
+    inStock: "Sotuvda bor",
     sortLabel: "Saralash",
     sort: {
       relevance: "Mosligi",
