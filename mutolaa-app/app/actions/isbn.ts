@@ -1,6 +1,6 @@
 "use server";
 
-import { isbnVariants } from "@/lib/isbn";
+import { fetchExternalIsbnMeta, isbnVariants, type ExternalIsbnBook } from "@/lib/isbn";
 import type { ShelfStatus } from "@/lib/shelf-types";
 import { createPublicClient } from "@/lib/supabase/public";
 import { createServerSupabase, getSessionUser } from "@/lib/supabase/server";
@@ -15,7 +15,10 @@ export type IsbnBook = {
   status: ShelfStatus | null; // foydalanuvchi javonidagi holati
 };
 
-export type IsbnResult = { kind: "found"; isbn: string; book: IsbnBook } | { kind: "not_found"; isbn: string } | { kind: "invalid" };
+export type IsbnResult =
+  | { kind: "found"; isbn: string; book: IsbnBook }
+  | { kind: "not_found"; isbn: string; external?: ExternalIsbnBook | null }
+  | { kind: "invalid" };
 
 const CARD = "id, slug, title, author_names, cover_url, page_count";
 
@@ -33,7 +36,10 @@ export async function lookupIsbn(raw: string): Promise<IsbnResult> {
     const { data } = await db.from("books").select(CARD).in("isbn_digits", variants).limit(1).maybeSingle();
     book = (data as Omit<IsbnBook, "status"> | null) ?? null;
   }
-  if (!book) return { kind: "not_found", isbn };
+  if (!book) {
+    const external = await fetchExternalIsbnMeta(isbn);
+    return { kind: "not_found", isbn, external };
+  }
 
   let status: ShelfStatus | null = null;
   const user = await getSessionUser();

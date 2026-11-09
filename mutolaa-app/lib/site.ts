@@ -6,6 +6,7 @@ export const site = {
   sources: [
     { name: "Mutolaa", url: "https://mutolaa.com" },
     { name: "Asaxiy", url: "https://asaxiy.uz/product/knigi" },
+    { name: "Hilol Nashr", url: "https://kitoblardunyosi.uz" },
   ],
 };
 

@@ -35,7 +35,7 @@ export async function getPublicProfile(username: string) {
   // RLS yopiq profilni faqat egasiga qaytaradi; egasi ham uni "ommaviy" sahifada koʻrmasin
   if (!profile || !profile.is_public) return null;
 
-  const [{ data: shelf }, { count: followers }, { count: following }, { data: myFollow }] = await Promise.all([
+  const [{ data: shelf }, { count: followers }, { count: following }, { data: myFollow }, { data: myShelf }] = await Promise.all([
     supabase
       .from("user_books")
       .select(`status, rating, review, finished_at, updated_at, books!inner(${BOOK_CARD})`)
@@ -46,6 +46,9 @@ export async function getPublicProfile(username: string) {
     me
       ? supabase.from("follows").select("following_id").eq("follower_id", me.id).eq("following_id", profile.id).maybeSingle()
       : Promise.resolve({ data: null }),
+    me && me.id !== profile.id
+      ? supabase.from("user_books").select("book_id").eq("user_id", me.id)
+      : Promise.resolve({ data: null }),
   ]);
   const rows = (shelf ?? []) as unknown as ShelfRow[];
   const year = new Date().toLocaleDateString("en-CA", { timeZone: "Asia/Tashkent" }).slice(0, 4);
@@ -53,11 +56,24 @@ export async function getPublicProfile(username: string) {
     .filter((r) => r.status === "read")
     .sort((a, b) => (b.finished_at ?? "").localeCompare(a.finished_at ?? ""));
 
+  let tasteMatch: { common: number; pct: number } | null = null;
+  if (myShelf && myShelf.length > 0 && rows.length > 0) {
+    const myIds = new Set(myShelf.map((r) => r.book_id as number));
+    const theirIds = new Set(rows.map((r) => r.books.id));
+    let common = 0;
+    for (const id of theirIds) if (myIds.has(id)) common++;
+    if (common > 0) {
+      const denom = Math.max(1, Math.min(myIds.size, theirIds.size));
+      tasteMatch = { common, pct: Math.min(100, Math.round((common / denom) * 100)) };
+    }
+  }
+
   return {
     profile: profile as PublicPerson & { yearly_goal: number | null; created_at: string },
     isSelf: me?.id === profile.id,
     isLoggedIn: Boolean(me),
     isFollowing: Boolean(myFollow),
+    tasteMatch,
     followers: followers ?? 0,
     following: following ?? 0,
     reading: rows.filter((r) => r.status === "reading").map((r) => r.books),
@@ -68,6 +84,19 @@ export async function getPublicProfile(username: string) {
       .filter((r) => r.review)
       .map((r) => ({ book: r.books, rating: r.rating, review: r.review!, date: r.finished_at ?? r.updated_at.slice(0, 10) })),
   };
+}
+
+export async function searchPublicUsers(q: string): Promise<PublicPerson[]> {
+  const clean = q.trim().replace(/^@/, "").replace(/[%_,()]/g, "");
+  if (!clean) return [];
+  const supabase = await createServerSupabase();
+  const { data } = await supabase
+    .from("profiles")
+    .select("id, username, display_name, avatar_url")
+    .eq("is_public", true)
+    .or(`username.ilike.%${clean}%,display_name.ilike.%${clean}%`)
+    .limit(12);
+  return (data ?? []) as PublicPerson[];
 }
 
 export type ActivityKind = ShelfStatus | "rated" | "reviewed";

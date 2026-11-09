@@ -43,6 +43,35 @@ export function answerCallback(callbackQueryId: string, text?: string) {
   return call("answerCallbackQuery", { callback_query_id: callbackQueryId, ...(text ? { text } : {}) });
 }
 
+export type InlineArticle = {
+  id: string;
+  title: string;
+  description?: string;
+  thumbnail_url?: string;
+  message_text: string;
+  url?: string;
+  button_text?: string;
+};
+
+export function answerInlineQuery(inlineQueryId: string, articles: InlineArticle[]) {
+  return call("answerInlineQuery", {
+    inline_query_id: inlineQueryId,
+    cache_time: 60,
+    results: articles.map((a) => ({
+      type: "article",
+      id: a.id,
+      title: a.title,
+      ...(a.description ? { description: a.description } : {}),
+      ...(a.thumbnail_url ? { thumbnail_url: a.thumbnail_url } : {}),
+      input_message_content: {
+        message_text: a.message_text,
+        parse_mode: "HTML",
+      },
+      ...(a.url ? { reply_markup: { inline_keyboard: [[{ text: a.button_text ?? "Sahifa'da ochish ↗", url: a.url }]] } } : {}),
+    })),
+  });
+}
+
 export async function downloadFile(fileId: string): Promise<ArrayBuffer | null> {
   const file = await call<{ file_path: string }>("getFile", { file_id: fileId });
   if (!file.ok || !file.result) return null;

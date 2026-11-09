@@ -37,3 +37,95 @@ export function isbnVariants(raw: string): string[] | null {
   if (isValidIsbn10(d)) return [isbn10To13(d), d];
   return null;
 }
+
+export type ExternalIsbnBook = {
+  title: string;
+  authors: string;
+  page_count: number | null;
+  year: number | null;
+  publisher: string | null;
+  cover_url: string | null;
+  description: string | null;
+};
+
+// Katalogda topilmagan ISBN uchun xalqaro ochiq bazalardan (Google Books / OpenLibrary) maʼlumot olish
+export async function fetchExternalIsbnMeta(isbn: string): Promise<ExternalIsbnBook | null> {
+  const variants = isbnVariants(isbn);
+  if (!variants) return null;
+  const code = variants[0];
+
+  try {
+    const res = await fetch(`https://www.googleapis.com/books/v1/volumes?q=isbn:${code}`, {
+      signal: AbortSignal.timeout(3500),
+    });
+    if (res.ok) {
+      const data = (await res.json()) as {
+        items?: {
+          volumeInfo?: {
+            title?: string;
+            authors?: string[];
+            pageCount?: number;
+            publishedDate?: string;
+            publisher?: string;
+            description?: string;
+            imageLinks?: { thumbnail?: string; smallThumbnail?: string };
+          };
+        }[];
+      };
+      const info = data.items?.[0]?.volumeInfo;
+      if (info?.title && info.authors?.length) {
+        const yearMatch = info.publishedDate?.match(/\b(1[5-9]\d{2}|20\d{2})\b/);
+        const rawCover = info.imageLinks?.thumbnail ?? info.imageLinks?.smallThumbnail ?? null;
+        return {
+          title: info.title.trim().slice(0, 200),
+          authors: info.authors.join(", ").slice(0, 300),
+          page_count: info.pageCount && info.pageCount > 0 && info.pageCount <= 10000 ? info.pageCount : null,
+          year: yearMatch ? Number(yearMatch[1]) : null,
+          publisher: info.publisher?.trim().slice(0, 120) ?? null,
+          cover_url: rawCover ? rawCover.replace(/^http:\/\//i, "https://") : null,
+          description: info.description?.trim().slice(0, 1500) ?? null,
+        };
+      }
+    }
+  } catch {
+    // keyingi manbaga oʻtamiz
+  }
+
+  try {
+    const key = `ISBN:${code}`;
+    const res = await fetch(`https://openlibrary.org/api/books?bibkeys=${key}&format=json&jscmd=data`, {
+      signal: AbortSignal.timeout(3500),
+    });
+    if (res.ok) {
+      const data = (await res.json()) as Record<
+        string,
+        {
+          title?: string;
+          authors?: { name?: string }[];
+          number_of_pages?: number;
+          publish_date?: string;
+          publishers?: { name?: string }[];
+          cover?: { medium?: string; large?: string };
+        }
+      >;
+      const item = data[key];
+      const authors = (item?.authors ?? []).map((a) => a.name?.trim()).filter(Boolean) as string[];
+      if (item?.title && authors.length) {
+        const yearMatch = item.publish_date?.match(/\b(1[5-9]\d{2}|20\d{2})\b/);
+        return {
+          title: item.title.trim().slice(0, 200),
+          authors: authors.join(", ").slice(0, 300),
+          page_count: item.number_of_pages && item.number_of_pages > 0 && item.number_of_pages <= 10000 ? item.number_of_pages : null,
+          year: yearMatch ? Number(yearMatch[1]) : null,
+          publisher: item.publishers?.[0]?.name?.trim().slice(0, 120) ?? null,
+          cover_url: item.cover?.large ?? item.cover?.medium ?? null,
+          description: null,
+        };
+      }
+    }
+  } catch {
+    // xalqaro bazaga ulanib boʻlmasa — shunchaki boʻsh qaytaramiz
+  }
+
+  return null;
+}

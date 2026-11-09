@@ -4,7 +4,7 @@
  *   npm run bot:setup            # webhook -> <NEXT_PUBLIC_APP_URL>/api/bot, buyruqlar menyusi
  *   npm run bot:setup -- --info  # hozirgi webhook holatini koʻrsatish
  *
- * Kerakli env: TELEGRAM_BOT_TOKEN, NEXT_PUBLIC_APP_URL, TELEGRAM_WEBHOOK_SECRET (ixtiyoriy, lekin tavsiya etiladi).
+ * Kerakli env: TELEGRAM_BOT_TOKEN, NEXT_PUBLIC_APP_URL, TELEGRAM_WEBHOOK_SECRET (majburiy).
  * Muhim: secret oʻrnatishdan oldin Vercel'ga ham shu TELEGRAM_WEBHOOK_SECRET qoʻshilgan va deploy qilingan boʻlsin,
  * aks holda bot barcha xabarlarni 401 bilan rad etadi.
  */
@@ -37,13 +37,17 @@ async function main() {
   }
 
   if (!appUrl.startsWith("https://")) throw new Error("NEXT_PUBLIC_APP_URL https:// bilan boshlanishi kerak");
+  // /api/bot secret'siz soʻrovlarni rad etadi — webhook ham faqat secret bilan oʻrnatiladi
+  if (secret.length < 16 || !/^[A-Za-z0-9_-]+$/.test(secret)) {
+    throw new Error("TELEGRAM_WEBHOOK_SECRET kerak: kamida 16 belgi, faqat A-Z a-z 0-9 _ - (masalan: openssl rand -hex 32)");
+  }
   const webhook = await call("setWebhook", {
     url: `${appUrl}/api/bot`,
     allowed_updates: ["message", "callback_query"],
     drop_pending_updates: false,
-    ...(secret ? { secret_token: secret } : {}),
+    secret_token: secret,
   });
-  console.log("setWebhook:", webhook.ok ? "✓" : webhook.description, secret ? "(secret bilan)" : "(secret'siz)");
+  console.log("setWebhook:", webhook.ok ? "✓ (secret bilan)" : webhook.description);
 
   const commands = await call("setMyCommands", {
     commands: [

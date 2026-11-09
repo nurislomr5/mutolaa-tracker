@@ -1,6 +1,7 @@
 import { NextResponse, type NextRequest } from "next/server";
 import { runReminders } from "@/lib/bot/reminders";
 import { createAdminClient } from "@/lib/supabase/admin";
+import { safeEqual } from "@/lib/safe-equal";
 
 export const maxDuration = 60;
 
@@ -8,7 +9,7 @@ export const maxDuration = 60;
 // Sinov: ?dry=1 (xabar yubormaydi, kimga nima ketishini qaytaradi), ?soat=21 (Toshkent soatini almashtirish)
 export async function POST(req: NextRequest) {
   const secret = (process.env.CRON_SECRET ?? "").trim();
-  if (!secret || req.headers.get("authorization") !== `Bearer ${secret}`) {
+  if (!secret || !safeEqual(req.headers.get("authorization") ?? "", `Bearer ${secret}`)) {
     return NextResponse.json({ ok: false }, { status: 401 });
   }
   const params = req.nextUrl.searchParams;

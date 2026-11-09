@@ -1,6 +1,6 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
 import { parseIntent, type BookContext, type Intent } from "@/lib/bot/ai";
-import { answerCallback, appUrl, downloadFile, drawBar, esc, sendMessage, type InlineButton } from "@/lib/bot/telegram";
+import { answerCallback, answerInlineQuery, appUrl, downloadFile, drawBar, esc, sendMessage, type InlineButton } from "@/lib/bot/telegram";
 import { formatDuration } from "@/lib/format";
 import { uz } from "@/lib/i18n/uz";
 import { applyProgress, setStatusFor } from "@/lib/shelf-ops";
@@ -24,6 +24,7 @@ export type TgUpdate = {
   update_id: number;
   message?: TgMessage;
   callback_query?: { id: string; from: TgUser; data?: string; message?: { chat: { id: number } } };
+  inline_query?: { id: string; from: TgUser; query: string };
 };
 
 type Profile = { id: string; display_name: string | null; yearly_goal: number | null };
@@ -44,6 +45,20 @@ export function progressLine(unit: string, current: number, total: number | null
 }
 
 const siteButton = (): InlineButton[] => [{ text: t.openSite, web_app: { url: appUrl() } }];
+
+const rateBuckets = new Map<string, { count: number; resetAt: number }>();
+
+export function allowBotRate(key: string, limit: number, windowMs = 60_000, now = Date.now()): boolean {
+  const b = rateBuckets.get(key);
+  if (!b || now >= b.resetAt) {
+    if (rateBuckets.size > 2000) rateBuckets.clear();
+    rateBuckets.set(key, { count: 1, resetAt: now + windowMs });
+    return true;
+  }
+  if (b.count >= limit) return false;
+  b.count++;
+  return true;
+}
 
 async function profileByTelegram(db: SupabaseClient, telegramId: number) {
   const { data: link } = await db.from("telegram_accounts").select("user_id").eq("telegram_id", telegramId).maybeSingle();
@@ -153,6 +168,35 @@ async function sendSearch(db: SupabaseClient, chatId: number, query: string) {
   ]);
   await sendMessage(chatId, `<b>${t.searchTitle}</b>\n\n${text}`, keyboard);
   return "search_sent";
+}
+
+async function sendRecommendations(db: SupabaseClient, chatId: number, userId: string) {
+  const { data: myBooks } = await db.from("user_books").select("book_id").eq("user_id", userId);
+  const excludeIds = new Set((myBooks ?? []).map((r) => r.book_id as number));
+  const { data } = await db
+    .from("books")
+    .select("id, slug, title, author_names, mutolaa_rating")
+    .order("mutolaa_reading_count", { ascending: false, nullsFirst: false })
+    .limit(40);
+  const candidates = ((data ?? []) as { id: number; slug: string; title: string; author_names: string | null; mutolaa_rating: number | null }[])
+    .filter((b) => !excludeIds.has(b.id))
+    .slice(0, 5);
+  if (!candidates.length) {
+    await sendMessage(chatId, t.noReading);
+    return "recommend_empty";
+  }
+  const text = candidates
+    .map(
+      (b, i) =>
+        `${i + 1}. <b>${esc(b.title)}</b>${b.author_names ? ` — ${esc(b.author_names)}` : ""}${b.mutolaa_rating ? ` (★ ${Number(b.mutolaa_rating).toFixed(1)})` : ""}`,
+    )
+    .join("\n");
+  const keyboard: InlineButton[][] = candidates.map((b, i) => [
+    { text: `${i + 1}. ${t.btnReading}`, callback_data: `st:${b.id}:reading` },
+    { text: `${i + 1}. ${t.btnWant}`, callback_data: `st:${b.id}:want` },
+  ]);
+  await sendMessage(chatId, `<b>✨ Siz uchun tavsiyalar:</b>\n\n${text}`, keyboard);
+  return "recommend_sent";
 }
 
 async function sendStats(db: SupabaseClient, chatId: number, profile: Profile) {
@@ -297,6 +341,40 @@ async function handleIntent(db: SupabaseClient, chatId: number, profile: Profile
 export async function handleUpdate(update: TgUpdate): Promise<string> {
   const db = createAdminClient();
 
+  // Inline qidiruv: @bot <kitob nomi>
+  if (update.inline_query) {
+    const iq = update.inline_query;
+    const q = iq.query.trim();
+    const { data } = q
+      ? await db.rpc("search_books", { q }).select("id, slug, title, author_names, cover_url, mutolaa_rating").limit(10)
+      : await db
+          .from("books")
+          .select("id, slug, title, author_names, cover_url, mutolaa_rating")
+          .order("mutolaa_reading_count", { ascending: false, nullsFirst: false })
+          .limit(10);
+    const rows = (data ?? []) as {
+      id: number;
+      slug: string;
+      title: string;
+      author_names: string | null;
+      cover_url: string | null;
+      mutolaa_rating: number | null;
+    }[];
+    const base = appUrl();
+    await answerInlineQuery(
+      iq.id,
+      rows.map((b) => ({
+        id: String(b.id),
+        title: b.title,
+        description: b.author_names ?? undefined,
+        thumbnail_url: b.cover_url?.startsWith("http") ? b.cover_url : undefined,
+        url: `${base}/kitob/${b.slug}`,
+        message_text: `📖 <b>${esc(b.title)}</b>${b.author_names ? `\n✍️ ${esc(b.author_names)}` : ""}${b.mutolaa_rating ? `\n⭐ ${Number(b.mutolaa_rating).toFixed(1)}` : ""}\n\n🔗 ${base}/kitob/${b.slug}`,
+      })),
+    );
+    return "inline_query";
+  }
+
   // Inline tugma: st:<bookId>:<status>
   if (update.callback_query) {
     const cq = update.callback_query;
@@ -324,6 +402,10 @@ export async function handleUpdate(update: TgUpdate): Promise<string> {
   // /start <token> — hisobni bogʻlash (bogʻlanmagan foydalanuvchi uchun ham ishlaydi)
   // /start login yoki /login — saytga kirish havolasi (hisob boʻlmasa yaratiladi)
   if (/^\/(?:start(?:@\w+)?\s+login|login(?:@\w+)?)$/.test(text)) {
+    if (!allowBotRate(`login:${msg.from.id}`, 5)) {
+      await sendMessage(chatId, uz.auth.rateLimit);
+      return "rate_limited";
+    }
     const url = await createLoginLink(db, msg.from);
     if (!url) {
       await sendMessage(chatId, t.error);
@@ -358,6 +440,7 @@ export async function handleUpdate(update: TgUpdate): Promise<string> {
     if (name === "status") return sendStatus(db, chatId, profile.id);
     if (name === "savollar") return sendQuestions(db, chatId, profile.id);
     if (name === "qidir") return sendSearch(db, chatId, arg);
+    if (name === "tavsiya") return sendRecommendations(db, chatId, profile.id);
     if (name === "statistika") return sendStats(db, chatId, profile);
     if (name === "eslatma") {
       // /eslatma 21 — kunlik eslatma soati (Toshkent), /eslatma off — oʻchirish
@@ -377,6 +460,10 @@ export async function handleUpdate(update: TgUpdate): Promise<string> {
 
   const voice = msg.voice ?? msg.audio;
   if (!voice && !text) return "unsupported";
+  if (!allowBotRate(`ai:${msg.from.id}`, 12)) {
+    await sendMessage(chatId, uz.auth.rateLimit);
+    return "rate_limited";
+  }
 
   const rows = await readingBooks(db, profile.id);
   let intent: Intent;

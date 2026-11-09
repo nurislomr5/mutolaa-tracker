@@ -65,12 +65,16 @@ export type Publisher = { name: string; slug: string; count: number };
 export type Topic = { name: string; slug: string; color: string | null; count: number };
 
 export type CatalogSort = "relevance" | "popular" | "rating" | "new" | "title";
+export type BookScript = "latin" | "cyrillic";
+export type BookSize = "short" | "medium" | "long";
 
 export type CatalogQuery = {
   q?: string;
   topic?: string;
   publisher?: string;
   format?: BookFormat;
+  script?: BookScript;
+  size?: BookSize;
   sort?: CatalogSort;
   page?: number;
 };
@@ -79,7 +83,7 @@ function fail(what: string, message: string): never {
   throw new Error(`${what}: ${message}`);
 }
 
-export async function getCatalog({ q = "", topic, publisher, format, sort, page = 1 }: CatalogQuery) {
+export async function getCatalog({ q = "", topic, publisher, format, script, size, sort, page = 1 }: CatalogQuery) {
   "use cache";
   cacheLife("hours");
   cacheTag("catalog");
@@ -95,6 +99,10 @@ export async function getCatalog({ q = "", topic, publisher, format, sort, page 
   if (topic) query = query.eq("book_topics.topics.slug", topic);
   if (publisher) query = query.eq("publishers.slug", publisher);
   if (format) query = query.contains("formats", [format]);
+  if (script) query = query.eq("script", script);
+  if (size === "short") query = query.gt("page_count", 0).lt("page_count", 200);
+  if (size === "medium") query = query.gte("page_count", 200).lte("page_count", 400);
+  if (size === "long") query = query.gt("page_count", 400);
 
   // relevance — search_books oʻzi tartiblaydi (qidiruv boʻlmasa mashhurlik boʻyicha)
   if (sort === "popular") query = query.order("mutolaa_reading_count", { ascending: false, nullsFirst: false });

@@ -12,6 +12,7 @@
     "import:mutolaa": "tsx scripts/import-mutolaa.ts",
     "bot:setup": "tsx scripts/telegram-webhook.ts",
     "import:asaxiy": "tsx scripts/import-asaxiy.ts",
+    "import:hilol": "tsx scripts/import-hilol.ts",
     "publishers:merge": "tsx scripts/merge-publishers.ts",
     "storage:setup": "tsx scripts/setup-storage.ts",
     "icons": "tsx scripts/generate-icons.ts"

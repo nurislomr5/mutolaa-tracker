@@ -44,6 +44,7 @@ export async function editBook(_prev: AddBookState, formData: FormData): Promise
   await linkAuthors(admin, book.id, authors, true);
 
   updateTag("catalog");
+  updateTag(`book:${input.slug}`);
   // Server redirect oʻrniga manzilni qaytaramiz — forma sahifani toʻliq qayta yuklaydi.
   // Sabab: action'dan keyingi client yoʻnaltirishda muqova olib tashlanganda eski rasm DOM'da qolib ketardi.
   return { ok: true, redirectTo: `/kitob/${input.slug}` };

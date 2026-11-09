@@ -1,7 +1,8 @@
 import { cache } from "react";
 import type { BookCardData } from "@/lib/catalog";
-import type { Note, NoteType, Shelf, ShelfStatus, UserBook } from "@/lib/shelf-types";
+import type { Note, NoteType, ReadingSession, Shelf, ShelfStatus, UserBook } from "@/lib/shelf-types";
 import { createServerSupabase, getSessionUser } from "@/lib/supabase/server";
+import { uzNormalize } from "@/lib/text/normalize";
 
 export * from "@/lib/shelf-types";
 
@@ -16,7 +17,7 @@ const BOOK_CARD = "id, slug, title, author_names, cover_url, formats, mutolaa_ra
 // Kitob sahifasida ikki joyda ishlatiladi — bitta soʻrov ichida bir marta bajariladi
 export const getBookShelfState = cache(async (bookId: number) => {
   const user = await getSessionUser();
-  if (!user) return { userBook: null, notes: [] as Note[], shelves: [], shelfIds: new Set<number>() };
+  if (!user) return { userBook: null, notes: [] as Note[], sessions: [] as ReadingSession[], shelves: [], shelfIds: new Set<number>() };
   const supabase = await createServerSupabase();
   const [{ data: userBook }, { data: shelves }, { data: inShelves }] = await Promise.all([
     supabase.from("user_books").select(USER_BOOK_COLUMNS).eq("user_id", user.id).eq("book_id", bookId).maybeSingle(),
@@ -24,17 +25,28 @@ export const getBookShelfState = cache(async (bookId: number) => {
     supabase.from("shelf_books").select("shelf_id").eq("book_id", bookId),
   ]);
   let notes: Note[] = [];
+  let sessions: ReadingSession[] = [];
   if (userBook) {
-    const { data } = await supabase
-      .from("notes")
-      .select("id, user_book_id, type, reference_point, content, is_resolved, created_at")
-      .eq("user_book_id", userBook.id)
-      .order("created_at", { ascending: false });
-    notes = (data ?? []) as Note[];
+    const [{ data: noteRows }, { data: sessionRows }] = await Promise.all([
+      supabase
+        .from("notes")
+        .select("id, user_book_id, type, reference_point, content, is_resolved, created_at")
+        .eq("user_book_id", userBook.id)
+        .order("created_at", { ascending: false }),
+      supabase
+        .from("reading_sessions")
+        .select("id, user_book_id, delta, new_value, source, created_at")
+        .eq("user_book_id", userBook.id)
+        .order("created_at", { ascending: false })
+        .limit(8),
+    ]);
+    notes = (noteRows ?? []) as Note[];
+    sessions = (sessionRows ?? []) as ReadingSession[];
   }
   return {
     userBook: (userBook as UserBook | null) ?? null,
     notes,
+    sessions,
     shelves: (shelves ?? []) as { id: number; name: string }[],
     shelfIds: new Set((inShelves ?? []).map((r) => r.shelf_id as number)),
   };
@@ -82,7 +94,7 @@ export async function getShelves(): Promise<Shelf[]> {
 
 export type NoteWithBook = Note & { book: { slug: string; title: string } };
 
-export async function getNotes({ type, openOnly }: { type?: NoteType; openOnly?: boolean }) {
+export async function getNotes({ type, openOnly, q }: { type?: NoteType; openOnly?: boolean; q?: string }) {
   const supabase = await createServerSupabase();
   let query = supabase
     .from("notes")
@@ -92,9 +104,12 @@ export async function getNotes({ type, openOnly }: { type?: NoteType; openOnly?:
   if (openOnly) query = query.eq("type", "savol").eq("is_resolved", false);
   const { data, error } = await query;
   if (error) throw new Error(`Qaydlar: ${error.message}`);
-  return ((data ?? []) as unknown as (Note & { user_books: { books: { slug: string; title: string } } })[]).map(
+  const items = ((data ?? []) as unknown as (Note & { user_books: { books: { slug: string; title: string } } })[]).map(
     ({ user_books, ...n }) => ({ ...n, book: user_books.books }),
   );
+  const norm = uzNormalize(q);
+  if (!norm) return items;
+  return items.filter((n) => uzNormalize(`${n.content} ${n.reference_point ?? ""} ${n.book.title}`).includes(norm));
 }
 
 export type Profile = {
@@ -113,12 +128,33 @@ export async function getProfile(): Promise<Profile | null> {
   const user = await getSessionUser();
   if (!user) return null;
   const supabase = await createServerSupabase();
-  const { data } = await supabase
-    .from("profiles")
-    .select("id, username, display_name, avatar_url, yearly_goal, is_public, reminder_hour, streak_alerts, weekly_digest")
-    .eq("id", user.id)
-    .maybeSingle();
-  return (data as Profile | null) ?? null;
+  const [{ data: base }, { data: rpcReminders, error: rpcError }] = await Promise.all([
+    supabase
+      .from("profiles")
+      .select("id, username, display_name, avatar_url, yearly_goal, is_public")
+      .eq("id", user.id)
+      .maybeSingle(),
+    supabase.rpc("my_reminder_settings").maybeSingle(),
+  ]);
+  if (!base) return null;
+
+  let reminders = rpcReminders as { reminder_hour: number | null; streak_alerts: boolean; weekly_digest: boolean } | null;
+  // 20261109000006 migratsiyasi hali bazaga qoʻllanmagan boʻlsa — bevosita jadvaldan oʻqiymiz
+  if (rpcError) {
+    const { data: fallback } = await supabase
+      .from("profiles")
+      .select("reminder_hour, streak_alerts, weekly_digest")
+      .eq("id", user.id)
+      .maybeSingle();
+    reminders = (fallback as typeof reminders) ?? null;
+  }
+
+  return {
+    ...(base as Omit<Profile, "reminder_hour" | "streak_alerts" | "weekly_digest">),
+    reminder_hour: reminders?.reminder_hour ?? null,
+    streak_alerts: reminders?.streak_alerts ?? true,
+    weekly_digest: reminders?.weekly_digest ?? true,
+  };
 }
 
 export async function isTelegramLinked() {

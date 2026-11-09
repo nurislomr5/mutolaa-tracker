@@ -1,4 +1,5 @@
 import Link from "next/link";
+import { ReviewText } from "@/components/shelf/review-form";
 import { Avatar } from "@/components/social/avatar";
 import { formatDate } from "@/lib/format";
 import { uz } from "@/lib/i18n/uz";
@@ -35,7 +36,7 @@ export async function ReadersSection({ bookId }: { bookId: number }) {
                   </Link>
                   {r.rating && <span className="ml-auto shrink-0 text-sm text-warning">★ {Number(r.rating).toFixed(1)}</span>}
                 </div>
-                {r.review && <p className="mt-3 line-clamp-6 whitespace-pre-line text-sm">{r.review}</p>}
+                <ReviewText review={r.review} className="mt-3 line-clamp-6 whitespace-pre-line text-sm" />
                 <p className="mt-2 text-xs text-muted">{formatDate(r.date)}</p>
               </li>
             );

@@ -5,6 +5,8 @@ import { BookGrid } from "@/components/book/book-card";
 import { ActivityHeatmap } from "@/components/stats/activity-heatmap";
 import { BarList } from "@/components/stats/bar-list";
 import { MonthBars } from "@/components/stats/month-bars";
+import { ShareStatsButton } from "@/components/stats/share-wrapped";
+import { Badge } from "@/components/ui/badge";
 import { Card, CardTitle } from "@/components/ui/card";
 import { Container } from "@/components/ui/container";
 import { Progress } from "@/components/ui/progress";
@@ -72,27 +74,51 @@ async function StatsView({ searchParams }: { searchParams: PageProps<"/statistik
   const t = uz.stats;
   const today = todayInTashkent();
   const hasData = stats.finished.length > 0 || stats.activeDays > 0;
+  const maxStreak = Math.max(stats.streak.current, stats.streak.longest);
+  const badges = [
+    { key: "firstBook", icon: "🌱", earned: stats.finished.length >= 1, ...t.badges.firstBook },
+    { key: "tenBooks", icon: "📚", earned: stats.finished.length >= 10, ...t.badges.tenBooks },
+    { key: "streak7", icon: "🔥", earned: maxStreak >= 7, ...t.badges.streak7 },
+    { key: "streak30", icon: "⚡", earned: maxStreak >= 30, ...t.badges.streak30 },
+    { key: "pages1000", icon: "📖", earned: stats.pages >= 1000, ...t.badges.pages1000 },
+    { key: "audio10h", icon: "🎧", earned: stats.minutes >= 600, ...t.badges.audio10h },
+    { key: "explorer", icon: "🧭", earned: stats.byTopic.length >= 3, ...t.badges.explorer },
+  ];
 
   return (
     <>
-      <div className="mb-6 flex flex-wrap items-baseline justify-between gap-3">
+      <div className="mb-6 flex flex-wrap items-center justify-between gap-3">
         <p className="text-muted">{t.subtitle(stats.year)}</p>
-        {stats.years.length > 1 && (
-          <nav className="flex gap-1" aria-label="Yillar">
-            {stats.years.map((y) => (
-              <Link
-                key={y}
-                href={`/statistika?yil=${y}`}
-                className={cn(
-                  "rounded-full px-3 py-1 text-sm",
-                  y === stats.year ? "bg-accent text-accent-fg" : "text-muted hover:bg-surface-2 hover:text-text",
-                )}
-              >
-                {y}
-              </Link>
-            ))}
-          </nav>
-        )}
+        <div className="flex flex-wrap items-center gap-2">
+          {hasData && (
+            <ShareStatsButton
+              year={stats.year}
+              booksRead={stats.finished.length}
+              goal={stats.goal}
+              pages={stats.pages}
+              minutes={stats.minutes}
+              longestStreak={stats.streak.longest}
+              activeDays={stats.activeDays}
+              topTopic={stats.byTopic[0]?.name}
+            />
+          )}
+          {stats.years.length > 1 && (
+            <nav className="flex gap-1" aria-label="Yillar">
+              {stats.years.map((y) => (
+                <Link
+                  key={y}
+                  href={`/statistika?yil=${y}`}
+                  className={cn(
+                    "rounded-full px-3 py-1 text-sm",
+                    y === stats.year ? "bg-accent text-accent-fg" : "text-muted hover:bg-surface-2 hover:text-text",
+                  )}
+                >
+                  {y}
+                </Link>
+              ))}
+            </nav>
+          )}
+        </div>
       </div>
 
       <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
@@ -112,6 +138,30 @@ async function StatsView({ searchParams }: { searchParams: PageProps<"/statistik
         <CardTitle>{t.activityTitle}</CardTitle>
         <p className="mb-4 mt-1 text-xs text-muted">{t.activityHint}</p>
         <ActivityHeatmap year={stats.year} activity={stats.activity} today={today} />
+      </Card>
+
+      <Card className="mt-6">
+        <CardTitle>{t.badgesTitle}</CardTitle>
+        <div className="mt-4 grid gap-2.5 sm:grid-cols-2 lg:grid-cols-4">
+          {badges.map((b) => (
+            <div
+              key={b.key}
+              className={cn(
+                "flex items-center gap-3 rounded-xl border p-3 transition-opacity",
+                b.earned ? "border-accent/40 bg-accent/5" : "border-border bg-surface-2 opacity-50",
+              )}
+            >
+              <span className="text-2xl">{b.icon}</span>
+              <div className="min-w-0 flex-1">
+                <div className="flex items-center gap-1.5">
+                  <p className="truncate text-sm font-semibold">{b.label}</p>
+                  {b.earned && <Badge tone="accent">✓</Badge>}
+                </div>
+                <p className="text-xs text-muted">{b.desc}</p>
+              </div>
+            </div>
+          ))}
+        </div>
       </Card>
 
       {!hasData && <p className="py-10 text-center text-muted">{t.empty}</p>}

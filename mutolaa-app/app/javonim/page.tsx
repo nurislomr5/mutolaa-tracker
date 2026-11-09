@@ -4,6 +4,7 @@ import { Suspense } from "react";
 import { BookCover } from "@/components/book/book-cover";
 import { InstallBanner } from "@/components/pwa/install-app";
 import { DeleteShelfButton } from "@/components/shelf/delete-shelf-button";
+import { ExportShelfCsvButton } from "@/components/shelf/export-buttons";
 import { ProgressForm } from "@/components/shelf/progress-form";
 import { buttonClasses } from "@/components/ui/button";
 import { Container } from "@/components/ui/container";
@@ -77,12 +78,15 @@ async function ShelfView({ searchParams }: { searchParams: PageProps<"/javonim">
 
   return (
     <>
-      <div className="-mx-4 flex gap-2 overflow-x-auto px-4 pb-1 sm:mx-0 sm:flex-wrap sm:px-0">
-        {STATUSES.map((s) => (
-          <Tab key={s} href={`/javonim?holat=${s}`} active={status === s}>
-            {uz.status[s]} <span className="text-xs opacity-70">{counts[s]}</span>
-          </Tab>
-        ))}
+      <div className="flex flex-wrap items-center justify-between gap-2">
+        <div className="-mx-4 flex gap-2 overflow-x-auto px-4 pb-1 sm:mx-0 sm:flex-wrap sm:px-0">
+          {STATUSES.map((s) => (
+            <Tab key={s} href={`/javonim?holat=${s}`} active={status === s}>
+              {uz.status[s]} <span className="text-xs opacity-70">{counts[s]}</span>
+            </Tab>
+          ))}
+        </div>
+        <ExportShelfCsvButton items={items} />
       </div>
 
       {shelves.length > 0 && (

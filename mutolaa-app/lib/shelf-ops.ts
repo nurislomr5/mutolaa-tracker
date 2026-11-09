@@ -18,11 +18,11 @@ export function defaultsFor(book: { formats: string[]; audio_seconds: number | n
   return { format: "paper", unit: "pages", total_value: null };
 }
 
-function statusDates(status: ShelfStatus, existing?: Pick<UserBook, "started_at" | "finished_at">) {
-  const today = todayInTashkent();
+function statusDates(status: ShelfStatus, existing?: Pick<UserBook, "started_at" | "finished_at">, onDate?: string) {
+  const day = onDate && /^\d{4}-\d{2}-\d{2}$/.test(onDate) ? onDate : todayInTashkent();
   return {
-    started_at: status === "reading" || status === "read" ? (existing?.started_at ?? today) : (existing?.started_at ?? null),
-    finished_at: status === "read" ? (existing?.finished_at ?? today) : null,
+    started_at: status === "reading" || status === "read" ? (existing?.started_at && existing.started_at <= day ? existing.started_at : day) : (existing?.started_at ?? null),
+    finished_at: status === "read" ? (existing?.finished_at ?? day) : null,
   };
 }
 
@@ -60,7 +60,7 @@ export async function setStatusFor(db: SupabaseClient, userId: string, bookId: n
   return { ok: !error, userBookId: (data?.id as number | undefined) ?? null };
 }
 
-export type ProgressInput = { format: ReadingFormat; unit: ProgressUnit; current: number; total: number };
+export type ProgressInput = { format: ReadingFormat; unit: ProgressUnit; current: number; total: number; date?: string };
 
 export async function applyProgress(
   db: SupabaseClient,
@@ -71,6 +71,8 @@ export async function applyProgress(
 ) {
   const total = input.unit === "percent" ? 100 : input.total;
   const current = Math.max(0, Math.min(input.current, total));
+  const today = todayInTashkent();
+  const validDate = input.date && /^\d{4}-\d{2}-\d{2}$/.test(input.date) && input.date <= today ? input.date : undefined;
 
   const { data: ub } = await db
     .from("user_books")
@@ -90,13 +92,21 @@ export async function applyProgress(
 
   const { error } = await db
     .from("user_books")
-    .update({ format: input.format, unit: input.unit, current_value: current, total_value: total, status, ...statusDates(status, ub) })
+    .update({ format: input.format, unit: input.unit, current_value: current, total_value: total, status, ...statusDates(status, ub, validDate) })
     .eq("id", ub.id)
     .eq("user_id", userId);
   if (error) return null;
 
   if (delta !== 0) {
-    await db.from("reading_sessions").insert({ user_id: userId, user_book_id: ub.id, delta, new_value: current, source });
+    const createdAt = validDate && validDate !== today ? `${validDate}T12:00:00+05:00` : undefined;
+    await db.from("reading_sessions").insert({
+      user_id: userId,
+      user_book_id: ub.id,
+      delta,
+      new_value: current,
+      source,
+      ...(createdAt ? { created_at: createdAt } : {}),
+    });
   }
   return { current, total, delta, finished };
 }

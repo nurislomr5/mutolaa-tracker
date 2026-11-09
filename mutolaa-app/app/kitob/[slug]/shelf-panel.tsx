@@ -1,7 +1,7 @@
 import Link from "next/link";
 import { CustomShelves } from "@/components/shelf/custom-shelves";
 import { NoteForm, NoteItem } from "@/components/shelf/notes";
-import { ProgressForm } from "@/components/shelf/progress-form";
+import { ProgressForm, ReadingSessionList } from "@/components/shelf/progress-form";
 import { RatingPicker } from "@/components/shelf/rating-picker";
 import { ReviewForm } from "@/components/shelf/review-form";
 import { StatusPicker } from "@/components/shelf/status-picker";
@@ -43,7 +43,7 @@ export async function EditBookLink({ book }: { book: BookDetail }) {
 export async function MyBookSection({ book }: { book: BookDetail }) {
   const user = await getSessionUser();
   if (!user) return null;
-  const { userBook, notes, shelves, shelfIds } = await getBookShelfState(book.id);
+  const { userBook, notes, shelves, shelfIds, sessions } = await getBookShelfState(book.id);
   if (!userBook) return null;
   const t = uz.shelf;
   const audioMinutes = book.audio_seconds ? Math.ceil(book.audio_seconds / 60) : null;
@@ -53,7 +53,7 @@ export async function MyBookSection({ book }: { book: BookDetail }) {
       <Card>
         <CardTitle>{t.progress}</CardTitle>
         <div className="mt-4">
-          <ProgressForm userBook={userBook} audioMinutes={audioMinutes} pageCount={book.page_count} />
+          <ProgressForm key={userBook.current_value} userBook={userBook} audioMinutes={audioMinutes} pageCount={book.page_count} />
         </div>
         {(userBook.started_at || userBook.finished_at) && (
           <p className="mt-4 text-xs text-muted">
@@ -62,6 +62,7 @@ export async function MyBookSection({ book }: { book: BookDetail }) {
             {userBook.finished_at && `${t.finished}: ${formatDate(userBook.finished_at)}`}
           </p>
         )}
+        <ReadingSessionList sessions={sessions} unit={userBook.unit} />
       </Card>
 
       <Card className="space-y-5">
@@ -86,7 +87,7 @@ export async function MyBookSection({ book }: { book: BookDetail }) {
           {notes.length > 0 ? (
             <ul className="space-y-3">
               {notes.map((n) => (
-                <NoteItem key={n.id} note={n} />
+                <NoteItem key={n.id} note={n} book={{ slug: book.slug, title: book.title }} />
               ))}
             </ul>
           ) : (

@@ -1,8 +1,11 @@
 import type { Metadata } from "next";
 import Link from "next/link";
 import { Suspense } from "react";
+import { ExportNotesButton } from "@/components/shelf/export-buttons";
 import { NoteItem } from "@/components/shelf/notes";
+import { Button } from "@/components/ui/button";
 import { Container } from "@/components/ui/container";
+import { Input } from "@/components/ui/input";
 import { uz } from "@/lib/i18n/uz";
 import { getNotes, NOTE_TYPES, type NoteType } from "@/lib/shelf";
 import { cn } from "@/lib/utils";
@@ -27,19 +30,32 @@ async function NotesView({ searchParams }: { searchParams: PageProps<"/qaydlar">
   const sp = await searchParams;
   const openOnly = sp.ochiq === "1";
   const type = !openOnly && NOTE_TYPES.includes(sp.tur as NoteType) ? (sp.tur as NoteType) : undefined;
-  const notes = await getNotes({ type, openOnly });
+  const q = typeof sp.q === "string" ? sp.q.trim() : "";
+  const notes = await getNotes({ type, openOnly, q: q || undefined });
 
   return (
     <>
+      <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
+        <form action="/qaydlar" className="flex flex-1 gap-2 sm:max-w-md">
+          {openOnly && <input type="hidden" name="ochiq" value="1" />}
+          {type && <input type="hidden" name="tur" value={type} />}
+          <Input type="search" name="q" defaultValue={q} placeholder={uz.notes.searchPlaceholder} aria-label={uz.notes.searchPlaceholder} />
+          <Button type="submit" variant="secondary">
+            {uz.catalog.searchButton}
+          </Button>
+        </form>
+        <ExportNotesButton notes={notes} />
+      </div>
+
       <div className="-mx-4 flex gap-2 overflow-x-auto px-4 pb-1 sm:mx-0 sm:flex-wrap sm:px-0">
-        <Filter href="/qaydlar" active={!type && !openOnly}>
+        <Filter href={q ? `/qaydlar?q=${encodeURIComponent(q)}` : "/qaydlar"} active={!type && !openOnly}>
           {uz.notes.all}
         </Filter>
-        <Filter href="/qaydlar?ochiq=1" active={openOnly}>
+        <Filter href={q ? `/qaydlar?ochiq=1&q=${encodeURIComponent(q)}` : "/qaydlar?ochiq=1"} active={openOnly}>
           ❓ {uz.notes.openQuestions}
         </Filter>
         {NOTE_TYPES.map((nt) => (
-          <Filter key={nt} href={`/qaydlar?tur=${nt}`} active={type === nt}>
+          <Filter key={nt} href={q ? `/qaydlar?tur=${nt}&q=${encodeURIComponent(q)}` : `/qaydlar?tur=${nt}`} active={type === nt}>
             {uz.noteType[nt]}
           </Filter>
         ))}

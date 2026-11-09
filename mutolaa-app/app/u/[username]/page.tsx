@@ -3,8 +3,10 @@ import Link from "next/link";
 import { notFound } from "next/navigation";
 import { Suspense } from "react";
 import { BookGrid } from "@/components/book/book-card";
+import { ReviewText } from "@/components/shelf/review-form";
 import { Avatar } from "@/components/social/avatar";
 import { FollowButton } from "@/components/social/follow-button";
+import { Badge } from "@/components/ui/badge";
 import { buttonClasses } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { Container } from "@/components/ui/container";
@@ -41,6 +43,11 @@ async function ProfileView({ params }: { params: PageProps<"/u/[username]">["par
           <p className="mt-1 text-sm text-muted">
             {t.followers(data.followers)} · {t.followingCount(data.following)}
           </p>
+          {data.tasteMatch && (
+            <div className="mt-2">
+              <Badge tone="accent">🤝 {t.commonBooks(data.tasteMatch.common, data.tasteMatch.pct)}</Badge>
+            </div>
+          )}
         </div>
         {data.isSelf ? (
           <Link href="/sozlamalar" className={buttonClasses({ variant: "secondary" })}>
@@ -85,7 +92,7 @@ async function ProfileView({ params }: { params: PageProps<"/u/[username]">["par
                   </Link>
                   {r.rating && <span className="shrink-0 text-sm text-warning">★ {Number(r.rating).toFixed(1)}</span>}
                 </div>
-                <p className="mt-2 line-clamp-6 whitespace-pre-line text-sm">{r.review}</p>
+                <ReviewText review={r.review} className="mt-2 line-clamp-6 whitespace-pre-line text-sm" />
                 <p className="mt-2 text-xs text-muted">{formatDate(r.date)}</p>
               </li>
             ))}

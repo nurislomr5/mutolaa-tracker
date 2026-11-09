@@ -129,7 +129,24 @@ export function Scanner() {
 
       {result?.kind === "not_found" && (
         <div className="rounded-2xl border border-border bg-surface p-5">
-          <p>{t.notFound(result.isbn)}</p>
+          <p>{ result.external ? t.externalFound : t.notFound(result.isbn) }</p>
+          {result.external && (
+            <div className="mt-3 rounded-xl bg-surface-2 p-3 text-sm">
+              <p className="font-serif font-semibold">{result.external.title}</p>
+              <p className="text-muted">{result.external.authors}</p>
+              {(result.external.page_count || result.external.year || result.external.publisher) && (
+                <p className="mt-1 text-xs text-muted">
+                  {[
+                    result.external.publisher,
+                    result.external.year,
+                    result.external.page_count ? `${result.external.page_count} bet` : null,
+                  ]
+                    .filter(Boolean)
+                    .join(" · ")}
+                </p>
+              )}
+            </div>
+          )}
           <Link href={`/kitob-qoshish?isbn=${result.isbn}`} className={buttonClasses({ className: "mt-4" })}>
             {t.addIt}
           </Link>

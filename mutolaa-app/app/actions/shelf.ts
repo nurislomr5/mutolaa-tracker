@@ -1,13 +1,13 @@
 "use server";
 
-import { refresh } from "next/cache";
+import { refresh, updateTag } from "next/cache";
 import { z } from "zod";
 import { uz } from "@/lib/i18n/uz";
 import { applyProgress, setStatusFor } from "@/lib/shelf-ops";
-import { FORMATS, NOTE_TYPES, STATUSES, UNITS } from "@/lib/shelf-types";
+import { FORMATS, joinNoteAnswer, NOTE_TYPES, parseReviewSpoiler, SPOILER_PREFIX, STATUSES, UNITS } from "@/lib/shelf-types";
 import { createServerSupabase, getSessionUser } from "@/lib/supabase/server";
 
-// Barcha amallar: foydalanuvchini tekshirish -> zod bilan validatsiya -> yozish (RLS ham himoya qiladi) -> sahifani yangilash.
+// Barcha amallar: foydalanuvchini tekshirish -> zod bilan validatsiya -> yozish (RLS + user_id filtri himoya qiladi) -> sahifani yangilash.
 export type ActionResult = { ok: true; message?: string } | { ok: false; error: string };
 
 const fail = (error: string = uz.common.error): ActionResult => ({ ok: false, error });
@@ -26,6 +26,7 @@ export async function setShelfStatus(bookId: number, status: string): Promise<Ac
   const { user, supabase } = await requireUser();
   const result = await setStatusFor(supabase, user.id, parsed.data.bookId, parsed.data.status);
   if (!result.ok) return fail();
+  updateTag(`reviews:${parsed.data.bookId}`);
   refresh();
   return { ok: true };
 }
@@ -33,9 +34,16 @@ export async function setShelfStatus(bookId: number, status: string): Promise<Ac
 export async function removeFromShelf(userBookId: number): Promise<ActionResult> {
   const parsed = id.safeParse(userBookId);
   if (!parsed.success) return fail();
-  const { supabase } = await requireUser();
-  const { error } = await supabase.from("user_books").delete().eq("id", parsed.data);
+  const { user, supabase } = await requireUser();
+  const { data, error } = await supabase
+    .from("user_books")
+    .delete()
+    .eq("id", parsed.data)
+    .eq("user_id", user.id)
+    .select("book_id")
+    .maybeSingle();
   if (error) return fail();
+  if (data?.book_id) updateTag(`reviews:${data.book_id}`);
   refresh();
   return { ok: true };
 }
@@ -46,6 +54,11 @@ const progressSchema = z.object({
   unit: z.enum(UNITS),
   current: z.coerce.number().int().min(0).max(1_000_000),
   total: z.coerce.number().int().positive().max(1_000_000),
+  date: z
+    .string()
+    .trim()
+    .optional()
+    .transform((v) => (v && /^\d{4}-\d{2}-\d{2}$/.test(v) ? v : undefined)),
 });
 
 export async function updateProgress(_prev: ActionResult | null, formData: FormData): Promise<ActionResult> {
@@ -59,14 +72,31 @@ export async function updateProgress(_prev: ActionResult | null, formData: FormD
   return { ok: true, message: result.finished ? "🎉 Kitob tugatildi!" : uz.shelf.saved };
 }
 
+export async function deleteReadingSession(sessionId: number): Promise<ActionResult> {
+  const parsed = id.safeParse(sessionId);
+  if (!parsed.success) return fail();
+  const { user, supabase } = await requireUser();
+  const { error } = await supabase.from("reading_sessions").delete().eq("id", parsed.data).eq("user_id", user.id);
+  if (error) return fail();
+  refresh();
+  return { ok: true };
+}
+
 export async function setRating(userBookId: number, rating: number | null): Promise<ActionResult> {
   const parsed = z
     .object({ userBookId: id, rating: z.number().min(0.5).max(5).multipleOf(0.5).nullable() })
     .safeParse({ userBookId, rating });
   if (!parsed.success) return fail();
-  const { supabase } = await requireUser();
-  const { error } = await supabase.from("user_books").update({ rating: parsed.data.rating }).eq("id", parsed.data.userBookId);
+  const { user, supabase } = await requireUser();
+  const { data, error } = await supabase
+    .from("user_books")
+    .update({ rating: parsed.data.rating })
+    .eq("id", parsed.data.userBookId)
+    .eq("user_id", user.id)
+    .select("book_id")
+    .maybeSingle();
   if (error) return fail();
+  if (data?.book_id) updateTag(`reviews:${data.book_id}`);
   refresh();
   return { ok: true };
 }
@@ -76,10 +106,19 @@ export async function saveReview(_prev: ActionResult | null, formData: FormData)
     .object({ userBookId: id, review: z.string().max(10_000) })
     .safeParse({ userBookId: formData.get("userBookId"), review: formData.get("review") ?? "" });
   if (!parsed.success) return fail();
-  const { supabase } = await requireUser();
-  const review = parsed.data.review.trim() || null;
-  const { error } = await supabase.from("user_books").update({ review }).eq("id", parsed.data.userBookId);
+  const { user, supabase } = await requireUser();
+  const cleanText = parseReviewSpoiler(parsed.data.review).text;
+  const isSpoiler = formData.get("is_spoiler") === "on" || formData.get("is_spoiler") === "true";
+  const review = cleanText ? (isSpoiler ? `${SPOILER_PREFIX}${cleanText}` : cleanText) : null;
+  const { data, error } = await supabase
+    .from("user_books")
+    .update({ review })
+    .eq("id", parsed.data.userBookId)
+    .eq("user_id", user.id)
+    .select("book_id")
+    .maybeSingle();
   if (error) return fail();
+  if (data?.book_id) updateTag(`reviews:${data.book_id}`);
   refresh();
   return { ok: true, message: uz.shelf.saved };
 }
@@ -112,8 +151,30 @@ export async function addNote(_prev: ActionResult | null, formData: FormData): P
 export async function setNoteResolved(noteId: number, resolved: boolean): Promise<ActionResult> {
   const parsed = z.object({ noteId: id, resolved: z.boolean() }).safeParse({ noteId, resolved });
   if (!parsed.success) return fail();
-  const { supabase } = await requireUser();
-  const { error } = await supabase.from("notes").update({ is_resolved: parsed.data.resolved }).eq("id", parsed.data.noteId);
+  const { user, supabase } = await requireUser();
+  const { error } = await supabase.from("notes").update({ is_resolved: parsed.data.resolved }).eq("id", parsed.data.noteId).eq("user_id", user.id);
+  if (error) return fail();
+  refresh();
+  return { ok: true };
+}
+
+export async function saveNoteAnswer(noteId: number, answer: string): Promise<ActionResult> {
+  const parsed = z.object({ noteId: id, answer: z.string().max(2_500) }).safeParse({ noteId, answer });
+  if (!parsed.success) return fail();
+  const { user, supabase } = await requireUser();
+  const { data: note } = await supabase
+    .from("notes")
+    .select("content")
+    .eq("id", parsed.data.noteId)
+    .eq("user_id", user.id)
+    .maybeSingle();
+  if (!note) return fail();
+  const nextContent = joinNoteAnswer(note.content, parsed.data.answer);
+  const { error } = await supabase
+    .from("notes")
+    .update({ content: nextContent, is_resolved: Boolean(parsed.data.answer.trim()) })
+    .eq("id", parsed.data.noteId)
+    .eq("user_id", user.id);
   if (error) return fail();
   refresh();
   return { ok: true };
@@ -122,8 +183,8 @@ export async function setNoteResolved(noteId: number, resolved: boolean): Promis
 export async function deleteNote(noteId: number): Promise<ActionResult> {
   const parsed = id.safeParse(noteId);
   if (!parsed.success) return fail();
-  const { supabase } = await requireUser();
-  const { error } = await supabase.from("notes").delete().eq("id", parsed.data);
+  const { user, supabase } = await requireUser();
+  const { error } = await supabase.from("notes").delete().eq("id", parsed.data).eq("user_id", user.id);
   if (error) return fail();
   refresh();
   return { ok: true };
@@ -163,8 +224,8 @@ export async function toggleShelfBook(shelfId: number, bookId: number, add: bool
 export async function deleteShelf(shelfId: number): Promise<ActionResult> {
   const parsed = id.safeParse(shelfId);
   if (!parsed.success) return fail();
-  const { supabase } = await requireUser();
-  const { error } = await supabase.from("shelves").delete().eq("id", parsed.data);
+  const { user, supabase } = await requireUser();
+  const { error } = await supabase.from("shelves").delete().eq("id", parsed.data).eq("user_id", user.id);
   if (error) return fail();
   refresh();
   return { ok: true };

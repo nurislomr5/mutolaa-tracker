@@ -7,7 +7,17 @@ import { FormatIcon } from "@/components/book/format-icons";
 import { Button, buttonClasses } from "@/components/ui/button";
 import { Container } from "@/components/ui/container";
 import { Input } from "@/components/ui/input";
-import { getCatalog, getPublisher, getTopics, PAGE_SIZE, type BookFormat, type CatalogQuery, type CatalogSort } from "@/lib/catalog";
+import {
+  getCatalog,
+  getPublisher,
+  getTopics,
+  PAGE_SIZE,
+  type BookFormat,
+  type BookScript,
+  type BookSize,
+  type CatalogQuery,
+  type CatalogSort,
+} from "@/lib/catalog";
 import { formatCount } from "@/lib/format";
 import { uz } from "@/lib/i18n/uz";
 import { cn } from "@/lib/utils";
@@ -19,6 +29,8 @@ export const metadata: Metadata = {
 
 const SORTS: CatalogSort[] = ["relevance", "popular", "rating", "new", "title"];
 const FORMATS: BookFormat[] = ["paper", "ebook", "audio"];
+const SCRIPTS: BookScript[] = ["latin", "cyrillic"];
+const SIZES: BookSize[] = ["short", "medium", "long"];
 
 type SearchParams = Record<string, string | string[] | undefined>;
 
@@ -27,6 +39,8 @@ function parseQuery(sp: SearchParams): CatalogQuery {
   const topic = one("rukn");
   const publisher = one("nashriyot");
   const format = one("format");
+  const script = one("yozuv");
+  const size = one("hajm");
   const sort = one("sort");
   const page = Number(one("sahifa") ?? 1);
   return {
@@ -34,6 +48,8 @@ function parseQuery(sp: SearchParams): CatalogQuery {
     topic: topic && /^[a-z0-9-]{1,80}$/.test(topic) ? topic : undefined,
     publisher: publisher && /^[a-z0-9-]{1,80}$/.test(publisher) ? publisher : undefined,
     format: FORMATS.includes(format as BookFormat) ? (format as BookFormat) : undefined,
+    script: SCRIPTS.includes(script as BookScript) ? (script as BookScript) : undefined,
+    size: SIZES.includes(size as BookSize) ? (size as BookSize) : undefined,
     sort: SORTS.includes(sort as CatalogSort) ? (sort as CatalogSort) : undefined,
     page: Number.isInteger(page) && page >= 1 && page <= 1000 ? page : 1,
   };
@@ -47,6 +63,8 @@ function catalogHref(q: CatalogQuery, patch: Partial<CatalogQuery>) {
   if (next.topic) params.set("rukn", next.topic);
   if (next.publisher) params.set("nashriyot", next.publisher);
   if (next.format) params.set("format", next.format);
+  if (next.script) params.set("yozuv", next.script);
+  if (next.size) params.set("hajm", next.size);
   if (next.sort) params.set("sort", next.sort);
   if (next.page && next.page > 1) params.set("sahifa", String(next.page));
   const s = params.toString();
@@ -76,7 +94,7 @@ async function Catalog({ searchParams }: { searchParams: Promise<SearchParams> }
   ]);
   const pages = Math.max(1, Math.ceil(total / PAGE_SIZE));
   const page = query.page ?? 1;
-  const hasFilters = Boolean(query.q || query.topic || query.publisher || query.format || query.sort);
+  const hasFilters = Boolean(query.q || query.topic || query.publisher || query.format || query.script || query.size || query.sort);
   const t = uz.catalog;
 
   return (
@@ -85,6 +103,8 @@ async function Catalog({ searchParams }: { searchParams: Promise<SearchParams> }
         <Input name="q" type="search" defaultValue={query.q} placeholder={t.searchPlaceholder} className="h-11 sm:flex-1" />
         {query.topic && <input type="hidden" name="rukn" value={query.topic} />}
         {query.format && <input type="hidden" name="format" value={query.format} />}
+        {query.script && <input type="hidden" name="yozuv" value={query.script} />}
+        {query.size && <input type="hidden" name="hajm" value={query.size} />}
         {query.publisher && <input type="hidden" name="nashriyot" value={query.publisher} />}
         <select
           name="sort"
@@ -106,7 +126,7 @@ async function Catalog({ searchParams }: { searchParams: Promise<SearchParams> }
         </Button>
       </Form>
 
-      <div className="mt-4 flex flex-wrap gap-2">
+      <div className="mt-4 flex flex-wrap items-center gap-2">
         {publisher && (
           <Chip href={catalogHref(query, { publisher: undefined })} active>
             {t.publisherFilter(publisher.name)} ✕
@@ -119,6 +139,18 @@ async function Catalog({ searchParams }: { searchParams: Promise<SearchParams> }
           <Chip key={f} href={catalogHref(query, { format: f })} active={query.format === f}>
             <FormatIcon format={f} className="h-3.5 w-3.5" />
             {uz.format[f]}
+          </Chip>
+        ))}
+        <span className="mx-1 hidden h-4 w-px bg-border sm:inline-block" aria-hidden />
+        {SCRIPTS.map((sc) => (
+          <Chip key={sc} href={catalogHref(query, { script: query.script === sc ? undefined : sc })} active={query.script === sc}>
+            {t.script[sc]}
+          </Chip>
+        ))}
+        <span className="mx-1 hidden h-4 w-px bg-border sm:inline-block" aria-hidden />
+        {SIZES.map((sz) => (
+          <Chip key={sz} href={catalogHref(query, { size: query.size === sz ? undefined : sz })} active={query.size === sz}>
+            {t.size[sz]}
           </Chip>
         ))}
       </div>

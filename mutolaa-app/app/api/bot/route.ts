@@ -1,14 +1,20 @@
 import { NextResponse, type NextRequest } from "next/server";
 import { handleUpdate, type TgUpdate } from "@/lib/bot/handlers";
+import { safeEqual } from "@/lib/safe-equal";
 
 // Ovozli xabar + Gemini tahlili oddiy 10 soniyadan uzoq choʻzilishi mumkin
 export const maxDuration = 60;
 
-// Telegram webhook. TELEGRAM_WEBHOOK_SECRET berilgan boʻlsa, faqat Telegram'dan kelgan soʻrovlar qabul qilinadi
+// Telegram webhook. Faqat TELEGRAM_WEBHOOK_SECRET bilan kelgan (ya'ni Telegram'dan) soʻrovlar qabul qilinadi
 // (scripts/telegram-webhook.ts webhook'ni shu secret bilan oʻrnatadi).
+// Secret majburiy: usiz har kim soxta update yuborib (from.id = boshqa odam), /login havolasini oʻz chatiga olishi mumkin edi.
 export async function POST(req: NextRequest) {
   const secret = (process.env.TELEGRAM_WEBHOOK_SECRET ?? "").trim();
-  if (secret && req.headers.get("x-telegram-bot-api-secret-token") !== secret) {
+  if (!secret) {
+    console.error("TELEGRAM_WEBHOOK_SECRET oʻrnatilmagan — bot soʻrovlari rad etiladi");
+    return NextResponse.json({ ok: false }, { status: 503 });
+  }
+  if (!safeEqual(req.headers.get("x-telegram-bot-api-secret-token") ?? "", secret)) {
     return NextResponse.json({ ok: false }, { status: 401 });
   }
 
