@@ -8,7 +8,7 @@ import { safeEqual } from "@/lib/safe-equal";
 import { safeNext } from "@/lib/safe-next";
 import { defaultsFor } from "@/lib/shelf-ops";
 import { addDays, computeStreaks, dayKey } from "@/lib/stats-utils";
-import { parseHilolPage } from "@/scripts/import-hilol";
+import { cleanPublisher, guessLanguage, parseCategoryPage, parseHilolPage, workKey } from "@/scripts/import-hilol";
 
 describe("safeEqual", () => {
   it("bir xil va har xil uzunlikdagi secret'larni xavfsiz solishtiradi", () => {
@@ -129,39 +129,116 @@ describe("nashriyot taxalluslari", () => {
   });
 });
 
-describe("Hilol-Nashr sahifa parseri", () => {
-  it("kitob maʼlumotlarini HTML'dan ajratib oladi", () => {
-    const html = `
-      <html>
-        <head><meta property="og:image" content="https://kitoblardunyosi.uz/image/cache/tafsiri-hilol.jpg" /></head>
-        <body>
-          <h1>Tafsiri Hilol</h1>
-          <table>
-            <tr><td>Muallif:</td><td>Shayx Muhammad Sodiq Muhammad Yusuf</td></tr>
-            <tr><td>Nashriyot:</td><td>Hilol-Nashr</td></tr>
-            <tr><td>Nashr yili:</td><td>2024</td></tr>
-            <tr><td>Betlar soni:</td><td>640</td></tr>
-            <tr><td>Yozuv:</td><td>Kirill</td></tr>
-            <tr><td>Muqova:</td><td>Qattiq</td></tr>
-            <tr><td>ISBN:</td><td>978-9943-5978-1-5</td></tr>
-          </table>
-          <span class="price-new">85 000 so'm</span>
-        </body>
-      </html>
-    `;
-    const parsed = parseHilolPage(html, "tafsiri-hilol");
-    expect(parsed).toMatchObject({
-      slug: "tafsiri-hilol",
-      title: "Tafsiri Hilol",
-      authors: ["Shayx Muhammad Sodiq Muhammad Yusuf"],
+describe("Hilol-Nashr (hilolnashr.uz) parseri", () => {
+  // Sayt tuzilmasining qisqartirilgan nusxasi (OpenCart): sarlavha, narx, mavjudlik, tavsifdagi "Yorliq: qiymat" qatorlari
+  const page = (fields: string, { stock = "in-stock", price = "39 000 сўм" } = {}) => `
+    <html><head><meta property="og:image" content="https://hilolnashr.uz/image/cache/x-600x315w.jpg" /></head><body>
+      <div class="product-card"><div class="product-price">999 000 сўм</div></div>
+      <h1 class="title page-title"><span>«Хаёла»</span></h1>
+      <div class="swiper-slide" data-largeimg="https://hilolnashr.uz/image/cache/catalog/01%20(5)-1000x1000h.jpg"></div>
+      <div class="product-stats"><ul><li class="product-stock ${stock}"><b>Stock:</b> <span>…</span></li></ul></div>
+      <div class="product-price-group"><div class="product-price">${price}</div></div>
+      <div class="block-content expand-content"><p>Китоб ҳақида.</p>
+        <p><b>Муаллиф:</b>&nbsp;Абдулкарим Ҳасан<br><b>Таржимон:</b> Жалолиддин Ҳамроқулов<br>${fields}</p>
+        <script>$("input[name='rating']").val(5);</script>
+      </div>
+      <div class="block-content expand-content"><b>Изоҳ:</b> HTML is not translated!</div>
+    </body></html>`;
+
+  it("kitob maʼlumotlarini tavsifdagi yorliqlardan oladi", () => {
+    const html = page(
+      "<b>Нашриёт:</b> «Hilol-Nashr» нашриёт-матбааси‎<br><b>Ҳажми:</b> 176 бет<br><b>Сана:</b> 2026 йил (2023, 2024)<br>" +
+        "<b>ISBN:</b>&nbsp;978-9910-273-91-9&nbsp;<br><b>Ўлчами:</b> Ўлчами: 14х21 см<br><b>Муқоваси:</b>&nbsp;юмшоқ",
+    );
+    expect(parseHilolPage(html, "Xayola-hn")).toEqual({
+      slug: "Xayola-hn",
+      url: "https://hilolnashr.uz/Xayola-hn",
+      title: "Хаёла",
+      authors: ["Абдулкарим Ҳасан"],
+      translator: "Жалолиддин Ҳамроқулов",
+      cover_url: "https://hilolnashr.uz/image/cache/catalog/01%20(5)-1000x1000h.jpg",
+      isbn: "978-9910-273-91-9",
+      page_count: 176,
+      published_year: 2026,
       publisher: "Hilol-Nashr",
-      published_year: 2024,
-      page_count: 640,
+      cover_type: "юмшоқ",
       script: "cyrillic",
-      cover_type: "Qattiq",
-      isbn: "978-9943-5978-1-5",
-      price: 85000,
+      language: "uz",
+      price: 39000,
       in_stock: true,
     });
+  });
+
+  it("sotuvda yoʻq mahsulot, lotin yorliqlari va 'Хажми' xatosi", () => {
+    const html = page("<b>Hajmi:</b> 208 bet<br><b>Sana:</b> 2025 yil<br><b>ISBN:</b> 978-9943-9130-4-2", { stock: "out-of-stock" });
+    expect(parseHilolPage(html, "x")).toMatchObject({ page_count: 208, published_year: 2025, in_stock: false, publisher: "Hilol-Nashr" });
+    expect(parseHilolPage(page("<b>Хажми:</b> 512 бет<br><b>ISBN:</b> 978-9910-619-84-7"), "y")?.page_count).toBe(512);
+  });
+
+  it("jurnal (ISSN, muallifsiz) va kitob boʻlmagan mahsulotlarni oʻtkazib yuboradi", () => {
+    const journal = page("").replace(/<b>Муаллиф:<\/b>[^<]*<br>/, "<b>Ғоя муаллифи:</b> X<br>") + "<b>ISSN:</b> 3030-346X";
+    expect(parseHilolPage(journal, "omina-jurnali-12-son")).toBeNull();
+    expect(parseHilolPage("<html><h1 class=\"title page-title\"><span>Сиз сўраган саҳифа топилмади!</span></h1></html>", "yoq")).toBeNull();
+  });
+
+  it("qator tashlanmagan yorliqlarni ajratadi", () => {
+    const html = page("").replace(
+      /<b>Муаллиф:<\/b>[^<]*<br><b>Таржимон:<\/b>[^<]*<br>/,
+      "Муаллиф: Ёрқинжон ФозилНашриёт: «Hilol-nashr» нашриётиСана: 2019 (2020, 2024)Ҳажми: 192 бетISBN: 978-9910-719-69-1",
+    );
+    expect(parseHilolPage(html, "x")).toMatchObject({
+      authors: ["Ёрқинжон Фозил"],
+      publisher: "Hilol-Nashr",
+      published_year: 2019,
+      page_count: 192,
+      isbn: "978-9910-719-69-1",
+    });
+  });
+
+  it("plakat va audio diskni oʻtkazib yuboradi", () => {
+    const html = page("<b>ISBN:</b> 978-9910-273-91-9");
+    expect(parseHilolPage(html.replace("«Хаёла»", "40 фарз (плакат)"), "40-farz-plakat")).toBeNull();
+    expect(parseHilolPage(html.replace("«Хаёла»", "«Жума мавъизалари» 9-диск (МР3)"), "salohiddin")).toBeNull();
+    expect(parseHilolPage(html.replace("«Хаёла»", "Араб алифбосининг ҳуснихат дафтари"), "daftar")).not.toBeNull();
+    // plakat ekani faqat tavsifda: "Муаллиф: …Номи: «…» (плакат)"
+    expect(parseHilolPage(html.replace("Абдулкарим Ҳасан", "Абдул Азим ЗиёуддинНоми: «Иймон калималари» (плакат)"), "Asmoi-husno-lotin")).toBeNull();
+  });
+
+  it("asar kaliti: yozuv va muqova izohi farq qilmaydi, jild raqami farq qiladi", () => {
+    expect(workKey("Виртуал олам болалари (кирилл)")).toBe(workKey("Virtual olam bolalari (lotincha)"));
+    expect(workKey("Бахтиёр оила (совғабоп, қутисиз)")).toBe(workKey("Baxtiyor oila"));
+    expect(workKey("Сийрати набавия (1-жуз)")).not.toBe(workKey("Сийрати набавия (2-жуз)"));
+    expect(workKey("Зикр аҳлидан сўранг тўплами 4-жилд (экспорт учун)")).toBe(workKey("Зикр аҳлидан сўранг тўплами 4-жилд"));
+  });
+
+  it("tuzuvchini muallif sifatida oladi", () => {
+    const html = page("<b>ISBN:</b> 978-9910-273-65-0").replace(/<b>Муаллиф:<\/b>[^<]*<br>/, "<b>Тўплаб, нашрга тайёрловчи:</b> Усмон Шавкатуллоҳ<br>");
+    expect(parseHilolPage(html, "rasulullohni-tanidim")?.authors).toEqual(["Усмон Шавкатуллоҳ"]);
+  });
+
+  it("nashr tilini slug va nomdan aniqlaydi", () => {
+    expect(guessLanguage("tajvidli-mushaf-urta-hajmda-qz", "Тәжуидті Құран (қозоқ ва рус тилида)")).toBe("kk");
+    expect(guessLanguage("muminning-umr-safari-qr", "Мөминниң өмир сапары")).toBe("kaa");
+    expect(guessLanguage("daloilul-xoyrot-arabic-hn", "Далоилул хайрот (arabic)")).toBe("ar");
+    expect(guessLanguage("sahih-nabaviy-duolar-rus-tilida", "Саҳиҳ набавий дуолар (рус тилида)")).toBe("ru");
+    expect(guessLanguage("Xayola-hn", "Хаёла")).toBe("uz");
+  });
+
+  it("nashriyot nomini tozalaydi va kategoriya roʻyxatidan slug'larni oladi", () => {
+    expect(cleanPublisher("«Hilol-Nashr» нашриёт-матбааси")).toBe("Hilol-Nashr");
+    for (const raw of ["«Hilol nashr»", "HILOL NASHR", "Нilol-Nashr", "Hilol", "«Hilol-Nashr» нашриёт-матбввси", "Ҳилол-Нашр", "Hilol Nahsr", "Hlol", "Hilol-Nashr нашр.."])
+      expect(cleanPublisher(raw), raw).toBe("Hilol-Nashr");
+    expect(cleanPublisher("Hilol media")).toBe("Hilol media");
+    expect(cleanPublisher("«Имом Бухорий халқаро илмий-тадқиқот маркази»")).toBe("Имом Бухорий халқаро илмий-тадқиқот маркази");
+    const list = `
+      <div class="module"><div class="name"><a href="https://hilolnashr.uz/yon-panel">Yon</a></div></div>
+      <div class="main-products product-grid">
+        <div class="name"><a href="https://hilolnashr.uz/hilol-nashr/Xayola-hn?page=1&amp;limit=100">«Хаёла»</a></div>
+        <div class="name"><a href="https://hilolnashr.uz/hilol-nashr/siyrati-nabaviya?page=1&amp;limit=100">x</a></div>
+        <div class="name"><a href="https://hilolnashr.uz/hilol-nashr/Xayola-hn?page=1&amp;limit=100">dup</a></div>
+      </div>
+      <div class="row pagination-results"></div>
+      <div class="name"><a href="https://hilolnashr.uz/karusel">K</a></div>`;
+    expect(parseCategoryPage(list)).toEqual(["Xayola-hn", "siyrati-nabaviya"]);
   });
 });

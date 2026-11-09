@@ -23,7 +23,7 @@ export type BookCardData = {
 };
 
 export type BookDetail = BookCardData & {
-  source: "mutolaa" | "asaxiy" | "user";
+  source: "mutolaa" | "asaxiy" | "user" | "hilol";
   created_by: string | null;
   description: string | null;
   audio_chapters: { title: string; seconds: number }[] | null;

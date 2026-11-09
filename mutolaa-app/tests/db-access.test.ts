@@ -327,3 +327,11 @@ describe("20261109000009: katalog filtrlari va yillik statistika", () => {
     expect(await slugs(`public.search_catalog('filtr', 'beta')`)).toEqual(["filtr-uch"]);
   });
 });
+
+describe("20261109000010: Hilol importeri kitob yarata oladi", () => {
+  it("books.source = 'hilol' ruxsat etilgan, notoʻgʻri manba esa yoʻq", async () => {
+    const ok = await as("service_role", null, `insert into public.books (slug, title, source, formats) values ('hilol-sinov', 'Sinov', 'hilol', '{paper}') returning id`);
+    expect(ok.rows).toHaveLength(1);
+    await expect(as("service_role", null, `insert into public.books (slug, title, source) values ('x-sinov', 'X', 'boshqa')`)).rejects.toThrow(/books_source_check/);
+  });
+});
