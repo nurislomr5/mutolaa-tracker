@@ -40,6 +40,10 @@ create index if not exists book_sources_in_stock_idx on public.book_sources (boo
 -- 2. Katalog qidiruvi + filtrlar. Nashriyot: kitobning oʻzi yoki uning biror nashri (book_sources) orqali.
 --    Til va "sotuvda bor" — bitta nashrga tegishli boʻlishi kerak (masalan, ruscha nashr sotuvda).
 -- ============================================================
+-- pg_trgm kutubxonasini shu seansda yuklash: aks holda Supabase SQL Editor (superuser emas) funksiyadagi
+-- "set pg_trgm.word_similarity_threshold" ni rad etadi — "permission denied to set parameter"
+select extensions.word_similarity('a', 'a');
+
 create or replace function public.search_catalog(
   q text,
   p_publisher text default null,
