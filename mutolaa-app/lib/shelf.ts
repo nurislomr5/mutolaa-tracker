@@ -124,7 +124,8 @@ export type Profile = {
   weekly_digest: boolean;
 };
 
-export async function getProfile(): Promise<Profile | null> {
+// Sarlavha va pastki menyu ikkalasi ham chaqiradi — bitta soʻrov ichida bir marta
+export const getProfile = cache(async (): Promise<Profile | null> => {
   const user = await getSessionUser();
   if (!user) return null;
   const supabase = await createServerSupabase();
@@ -155,7 +156,7 @@ export async function getProfile(): Promise<Profile | null> {
     streak_alerts: reminders?.streak_alerts ?? true,
     weekly_digest: reminders?.weekly_digest ?? true,
   };
-}
+});
 
 export async function isTelegramLinked() {
   const user = await getSessionUser();

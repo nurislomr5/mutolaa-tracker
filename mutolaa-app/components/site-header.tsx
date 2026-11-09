@@ -17,6 +17,8 @@ const links = [
   { href: "/skaner", label: uz.scanner.nav },
 ];
 
+const MOBILE_BOTTOM = new Set(["/kitoblar", "/javonim", "/lenta"]);
+
 export function Logo() {
   return (
     <Link href="/" className="flex items-center gap-2 font-serif text-lg font-semibold">
@@ -49,9 +51,9 @@ export function SiteHeader() {
           </Suspense>
         </div>
       </Container>
-      {/* Mobil: havolalar pastki qatorda, gorizontal aylantiriladi */}
+      {/* Mobil: Kitoblar, Javonim, Lenta — pastki menyuda (components/bottom-nav.tsx); qolganlari shu qatorda */}
       <nav className="flex gap-1 overflow-x-auto border-t border-border px-4 py-2 md:hidden">
-        {links.map((l) => (
+        {links.filter((l) => !MOBILE_BOTTOM.has(l.href)).map((l) => (
           <Link key={l.href} href={l.href} className={buttonClasses({ variant: "ghost", size: "sm", className: "shrink-0" })}>
             {l.label}
           </Link>

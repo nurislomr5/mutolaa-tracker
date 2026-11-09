@@ -1,5 +1,6 @@
 import type { Metadata, Viewport } from "next";
 import { Inter, Literata } from "next/font/google";
+import { BottomNav } from "@/components/bottom-nav";
 import { SiteHeader } from "@/components/site-header";
 import { SiteFooter } from "@/components/site-footer";
 import { TelegramAutoLogin } from "@/components/telegram-auto-login";
@@ -38,6 +39,8 @@ export const metadata: Metadata = {
 
 // Brauzer paneli va oʻrnatilgan ilova sarlavhasi rangi — sahifa foni bilan bir xil
 export const viewport: Viewport = {
+  // iPhone: pastki menyu "home indicator" chizigʻi ustida turishi uchun (env(safe-area-inset-bottom))
+  viewportFit: "cover",
   themeColor: [
     { media: "(prefers-color-scheme: light)", color: "#faf7f2" },
     { media: "(prefers-color-scheme: dark)", color: "#14120f" },
@@ -59,6 +62,7 @@ export default function RootLayout({ children }: LayoutProps<"/">) {
         <SiteHeader />
         <main className="flex-1">{children}</main>
         <SiteFooter />
+        <BottomNav />
         <PwaSetup />
       </body>
     </html>
