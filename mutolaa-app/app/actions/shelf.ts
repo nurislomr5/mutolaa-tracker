@@ -20,6 +20,14 @@ async function requireUser() {
 
 const id = z.coerce.number().int().positive();
 
+type Db = Awaited<ReturnType<typeof createServerSupabase>>;
+
+// RLS ham yopadi, lekin aniq tekshiruv begona id'ni yozishdan oldin rad etadi va xatoni tushunarli qiladi
+async function ownsRow(supabase: Db, table: "user_books" | "shelves", rowId: number, userId: string) {
+  const { data } = await supabase.from(table).select("id").eq("id", rowId).eq("user_id", userId).maybeSingle();
+  return Boolean(data);
+}
+
 export async function setShelfStatus(bookId: number, status: string): Promise<ActionResult> {
   const parsed = z.object({ bookId: id, status: z.enum(STATUSES) }).safeParse({ bookId, status });
   if (!parsed.success) return fail();
@@ -136,6 +144,7 @@ export async function addNote(_prev: ActionResult | null, formData: FormData): P
     .safeParse(Object.fromEntries(formData));
   if (!parsed.success) return fail("Qayd matnini kiriting.");
   const { user, supabase } = await requireUser();
+  if (!(await ownsRow(supabase, "user_books", parsed.data.userBookId, user.id))) return fail();
   const { error } = await supabase.from("notes").insert({
     user_id: user.id,
     user_book_id: parsed.data.userBookId,
@@ -204,7 +213,14 @@ export async function createShelf(_prev: ActionResult | null, formData: FormData
     .select("id")
     .single();
   if (error) return fail(error.code === "23505" ? "Bunday nomli javon bor." : undefined);
-  if (parsed.data.bookId) await supabase.from("shelf_books").insert({ shelf_id: shelf.id, book_id: parsed.data.bookId });
+  if (parsed.data.bookId) {
+    const { error: linkError } = await supabase.from("shelf_books").insert({ shelf_id: shelf.id, book_id: parsed.data.bookId });
+    if (linkError) {
+      // Kitobsiz boʻsh javon qolmasin — aks holda qayta urinishda "Bunday nomli javon bor" chiqadi
+      await supabase.from("shelves").delete().eq("id", shelf.id).eq("user_id", user.id);
+      return fail();
+    }
+  }
   refresh();
   return { ok: true };
 }
@@ -212,7 +228,8 @@ export async function createShelf(_prev: ActionResult | null, formData: FormData
 export async function toggleShelfBook(shelfId: number, bookId: number, add: boolean): Promise<ActionResult> {
   const parsed = z.object({ shelfId: id, bookId: id, add: z.boolean() }).safeParse({ shelfId, bookId, add });
   if (!parsed.success) return fail();
-  const { supabase } = await requireUser();
+  const { user, supabase } = await requireUser();
+  if (!(await ownsRow(supabase, "shelves", parsed.data.shelfId, user.id))) return fail();
   const { error } = parsed.data.add
     ? await supabase.from("shelf_books").upsert({ shelf_id: parsed.data.shelfId, book_id: parsed.data.bookId })
     : await supabase.from("shelf_books").delete().eq("shelf_id", parsed.data.shelfId).eq("book_id", parsed.data.bookId);

@@ -115,6 +115,37 @@ describe("migratsiyalar va ruxsatlar", () => {
     expect(feed.rows.length).toBeGreaterThan(0);
   });
 
+  it("egalik: boshqa foydalanuvchi javon, qayd, sessiya va progressga tegolmaydi (app/actions/shelf.ts)", async () => {
+    const ub = (await db.query<{ id: number }>(`select id from public.user_books where user_id = $1 limit 1`, [A])).rows[0].id;
+    const book = (await db.query<{ id: number }>(`select id from public.books where slug = 'odisseya'`)).rows[0].id;
+    const shelf = (await as("authenticated", A, `insert into public.shelves (user_id, name) values ($1, 'Sevimlilar') returning id`, [A])).rows[0].id;
+    await as("authenticated", A, `insert into public.shelf_books (shelf_id, book_id) values ($1, $2)`, [shelf, book]);
+    await as("authenticated", A, `insert into public.notes (user_id, user_book_id, type, content) values ($1, $2, 'iqtibos', 'Sir')`, [A, ub]);
+
+    // addNote: B oʻz user_id si bilan, lekin A ning kitobiga
+    await expectDenied("authenticated", B, `insert into public.notes (user_id, user_book_id, type, content) values ($1, $2, 'iqtibos', 'hack')`, [B, ub]);
+    // B A nomidan yozolmaydi
+    await expectDenied("authenticated", B, `insert into public.notes (user_id, user_book_id, type, content) values ($1, $2, 'iqtibos', 'hack')`, [A, ub]);
+    await expectDenied("authenticated", B, `insert into public.reading_sessions (user_id, user_book_id, delta, new_value, source) values ($1, $2, 5, 5, 'web')`, [B, ub]);
+    // toggleShelfBook: B A ning javoniga kitob qoʻsholmaydi va oʻchira olmaydi
+    await expectDenied("authenticated", B, `insert into public.shelf_books (shelf_id, book_id) values ($1, $2)`, [shelf, book]);
+    const removed = await as("authenticated", B, `delete from public.shelf_books where shelf_id = $1 returning 1`, [shelf]);
+    expect(removed.rows).toHaveLength(0);
+    // Yashirin maʼlumotlar koʻrinmaydi, oʻzgartirib boʻlmaydi
+    expect((await as("authenticated", B, `select id from public.notes where user_book_id = $1`, [ub])).rows).toHaveLength(0);
+    expect((await as("authenticated", B, `select id from public.shelves where id = $1`, [shelf])).rows).toHaveLength(0);
+    expect((await as("authenticated", B, `select shelf_id from public.shelf_books where shelf_id = $1`, [shelf])).rows).toHaveLength(0);
+    expect((await as("authenticated", B, `update public.user_books set rating = 1 where id = $1 returning 1`, [ub])).rows).toHaveLength(0);
+    expect((await as("authenticated", B, `delete from public.user_books where id = $1 returning 1`, [ub])).rows).toHaveLength(0);
+    expect((await as("authenticated", B, `delete from public.shelves where id = $1 returning 1`, [shelf])).rows).toHaveLength(0);
+    // A ning maʼlumotlari joyida
+    const left = await db.query<{ n: number }>(
+      `select (select count(*) from public.shelf_books where shelf_id = $1)::int + (select count(*) from public.notes where user_book_id = $2)::int as n`,
+      [shelf, ub],
+    );
+    expect(left.rows[0].n).toBe(2);
+  });
+
   it("Telegram ulash: token faqat bazada yaratiladi (app/actions/telegram.ts)", async () => {
     await as("authenticated", A, `delete from public.telegram_link_tokens where user_id = $1`, [A]);
     const t = await as("authenticated", A, `insert into public.telegram_link_tokens (user_id) values ($1) returning token`, [A]);
