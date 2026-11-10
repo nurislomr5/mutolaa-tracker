@@ -35,12 +35,17 @@ export function LegalPage({ doc, other }: { doc: LegalDoc; other: { href: string
 
       <section className="mt-8">
         <h2 className="font-serif text-xl font-semibold">{t.contact}</h2>
-        {site.contact && (
+        {site.contacts.length > 0 && (
           <p className="mt-3 leading-relaxed">
             {t.contactLead}{" "}
-            <a href={site.contact.url} className="font-medium text-accent hover:underline" data-no-translit>
-              {site.contact.label}
-            </a>
+            {site.contacts.map((c, i) => (
+              <span key={c.url}>
+                {i > 0 && ", "}
+                <a href={c.url} className="font-medium text-accent hover:underline" data-no-translit>
+                  {c.label}
+                </a>
+              </span>
+            ))}
           </p>
         )}
         <p className="mt-3 leading-relaxed">{t.contactReport}</p>

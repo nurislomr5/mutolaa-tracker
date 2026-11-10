@@ -8,9 +8,11 @@ export const site = {
     { name: "Asaxiy", url: "https://asaxiy.uz/product/knigi" },
     { name: "Hilol Nashr", url: "https://hilolnashr.uz" },
   ],
-  // murojaat uchun manzil (maxfiylik va shartlar sahifalarida koʻrsatiladi), masalan:
-  // { label: "@sahifa_admin", url: "https://t.me/sahifa_admin" } yoki { label: "salom@sahifa.uz", url: "mailto:salom@sahifa.uz" }
-  contact: null as { label: string; url: string } | null,
+  // murojaat uchun manzillar (maxfiylik va shartlar sahifalarida koʻrsatiladi); boʻsh boʻlsa — faqat «Xatoni bildirish» eslatiladi
+  contacts: [
+    { label: "@nurislomx", url: "https://t.me/nurislomx" },
+    { label: "nurislomx.pro@gmail.com", url: "mailto:nurislomx.pro@gmail.com" },
+  ] as { label: string; url: string }[],
 };
 
 // Saytning toʻliq manzili (SEO: sitemap, canonical, OG; bot havolalari). NEXT_PUBLIC_APP_URL https boʻlmasa — Vercel domeni.
