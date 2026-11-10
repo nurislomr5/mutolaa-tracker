@@ -25,8 +25,10 @@ export const privacy: LegalDoc = {
           "Boshqalar bilan bogʻliq maʼlumot: kimni kuzatayotganingiz, taqrizlarga bergan «Foydali» ovozlaringiz, klublarga aʼzoligingiz va muhokamadagi xabarlaringiz.",
           "Siz katalogga qoʻshgan kitoblar va muqova rasmlari, katalogdagi xato haqida yuborgan xabarlaringiz.",
           "Texnik maʼlumot: xosting xizmati server jurnallarida IP-manzil va brauzer turini qisqa muddat saqlaydi.",
+          "Tashrif statistikasi: qaysi sahifa necha marta ochilgani, qaysi saytdan kelingani, mamlakat, qurilma va brauzer turi. Bu maʼlumot umumlashtirilgan holda yigʻiladi — u hisobingizga bogʻlanmaydi va sizni shaxsan aniqlamaydi, cookie ishlatilmaydi.",
+          "Shikoyatlar: taqriz, klubdagi xabar yoki profil ustidan shikoyat yuborsangiz — shikoyat matni va kim yuborgani; sizning yozganingiz ustidan shikoyat tushsa — oʻsha matnning nusxasi. Shikoyatni faqat sayt maʼmuri koʻradi.",
         ],
-        "Reklama yoki kuzatuv (analitika) kodlari saytga oʻrnatilmagan.",
+        "Reklama kodlari va sizni saytdan saytga kuzatadigan vositalar oʻrnatilmagan.",
       ],
     },
     {
@@ -59,8 +61,9 @@ export const privacy: LegalDoc = {
         "Sayt ishlashi uchun quyidagi xizmatlardan foydalanamiz. Maʼlumot ularga faqat koʻrsatilgan maqsadda uzatiladi:",
         [
           "Supabase — maʼlumotlar bazasi va kirish tizimi.",
-          "Vercel — sayt xostingi.",
+          "Vercel — sayt xostingi va tashrif statistikasi (Vercel Web Analytics).",
           "Telegram — bot, eslatmalar va Telegram orqali kirish.",
+          "GitHub — bazaning haftalik zaxira nusxalari shifrlangan holda shu yerda saqlanadi.",
           "Google — Google orqali kirish. Botga yuborgan matnli yoki ovozli xabaringiz uni tushunish uchun Google Gemini sunʼiy intellektiga uzatiladi; xabar bilan birga javoningizdagi kitoblar nomi ham yuboriladi. Bot xabarlarini oʻzimiz saqlamaymiz — faqat natija (progress yoki qayd) javoningizga yoziladi.",
           "Google Books va Open Library — kitobni ISBN boʻyicha qidirganda ularga faqat ISBN raqami yuboriladi.",
         ],
@@ -71,7 +74,7 @@ export const privacy: LegalDoc = {
       heading: "Cookie va qurilmangizdagi maʼlumot",
       body: [
         [
-          "Cookie faqat hisobingizga kirgan holda qolishingiz uchun ishlatiladi. Reklama yoki kuzatuv cookie'lari yoʻq.",
+          "Cookie faqat hisobingizga kirgan holda qolishingiz uchun ishlatiladi. Reklama yoki kuzatuv cookie'lari yoʻq; tashrif statistikasi ham cookie'siz ishlaydi.",
           "Brauzeringiz xotirasida tanlagan mavzu (yorugʻ yoki qorongʻi), alifbo, oʻqish taymeri va internetsiz ishlash uchun javoningizning nusxasi saqlanadi. Bular faqat sizning qurilmangizda turadi; hisobdan chiqsangiz, javon nusxasi oʻchadi.",
         ],
       ],
@@ -84,7 +87,7 @@ export const privacy: LegalDoc = {
           "Telegram'ni uzish: Sozlamalar → Telegram bot → «Uzish».",
           "Hisobni oʻchirish: Sozlamalar → «Hisobni oʻchirish». Profilingiz, javoningiz, progress, qayd va taqrizlaringiz, obuna va ovozlaringiz, klublardagi aʼzolik va xabarlaringiz, Telegram bogʻlanishi shu zahoti oʻchadi. Buni ortga qaytarib boʻlmaydi.",
         ],
-        "Siz ochgan klublar hisobingiz bilan birga, butun muhokamasi bilan oʻchadi. Siz katalogga qoʻshgan kitoblar katalogda qoladi, lekin ular endi sizga bogʻlanmagan boʻladi. Bazaning texnik zaxira nusxalarida maʼlumot yana qisqa muddat saqlanib turishi mumkin.",
+        "Siz ochgan klublar hisobingiz bilan birga, butun muhokamasi bilan oʻchadi. Siz katalogga qoʻshgan kitoblar katalogda qoladi, lekin ular endi sizga bogʻlanmagan boʻladi. Bazaning haftalik zaxira nusxalarida (ular shifrlangan holda saqlanadi) maʼlumot yana 90 kungacha saqlanib turishi mumkin.",
         "Hisobni oʻchirgach, Telegram yoki email orqali qayta kirsangiz, yangi boʻsh hisob ochiladi.",
       ],
     },

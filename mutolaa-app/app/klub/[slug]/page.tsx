@@ -4,6 +4,7 @@ import { notFound } from "next/navigation";
 import { Suspense } from "react";
 import { BookCover } from "@/components/book/book-cover";
 import { Avatar } from "@/components/social/avatar";
+import { ReportButton } from "@/components/social/report-button";
 import { Badge } from "@/components/ui/badge";
 import { Card, CardTitle } from "@/components/ui/card";
 import { Container } from "@/components/ui/container";
@@ -62,7 +63,8 @@ function MemberRow({ m, club, canRemove }: { m: ClubMember; club: ClubPage; canR
   );
 }
 
-function PostView({ post, clubId, canReply }: { post: ClubPost; clubId: number; canReply: boolean }) {
+// canReport: tizimga kirgan va xabar muallifi boʻlmagan odam (klub aʼzosi boʻlishi shart emas)
+function PostView({ post, clubId, canReply, viewerId }: { post: ClubPost; clubId: number; canReply: boolean; viewerId: string | null }) {
   return (
     <div className="flex gap-3">
       <Avatar name={post.display_name} src={post.avatar_url} size={32} />
@@ -78,9 +80,10 @@ function PostView({ post, clubId, canReply }: { post: ClubPost; clubId: number; 
           <span className="ml-2 text-xs text-muted">{formatDate(post.created_at)}</span>
         </p>
         <p className="mt-1 whitespace-pre-line break-words text-sm">{post.body}</p>
-        <div className="mt-1 flex gap-4">
+        <div className="mt-1 flex flex-wrap items-center gap-x-4 gap-y-2">
           {canReply && <ReplyToggle clubId={clubId} parentId={post.id} />}
           {post.can_delete && <DeletePostButton postId={post.id} />}
+          {viewerId && viewerId !== post.user_id && <ReportButton type="club_post" id={post.id} />}
         </div>
       </div>
     </div>
@@ -146,12 +149,12 @@ async function ClubView({ params }: { params: PageProps<"/klub/[slug]">["params"
               <ul className="mt-5 space-y-5">
                 {threads.map((th) => (
                   <li key={th.id} className="rounded-2xl border border-border bg-surface p-4">
-                    <PostView post={th} clubId={club.id} canReply={club.is_member} />
+                    <PostView post={th} clubId={club.id} canReply={club.is_member} viewerId={user?.id ?? null} />
                     {th.replies.length > 0 && (
                       <ul className="ml-11 mt-3 space-y-3 border-l border-border pl-4">
                         {th.replies.map((r) => (
                           <li key={r.id}>
-                            <PostView post={r} clubId={club.id} canReply={false} />
+                            <PostView post={r} clubId={club.id} canReply={false} viewerId={user?.id ?? null} />
                           </li>
                         ))}
                       </ul>

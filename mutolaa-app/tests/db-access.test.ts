@@ -598,6 +598,103 @@ describe("20261111000013: kitobxonlik klublari", () => {
   });
 });
 
+describe("20261112000014: shikoyatlar navbati va admin paneli", () => {
+  const q1 = async <T = Record<string, unknown>>(sql: string, params: unknown[] = []) => (await db.query<T>(sql, params)).rows;
+  const C = "00000000-0000-0000-0000-00000000000c"; // oldingi bloklarda yaratilgan
+  const INSERT = `insert into public.content_reports (reporter_id, target_type, target_id, target_user_id, reason, message, snapshot)
+    values ($1, $2, $3, $4, $5, $6, 'nusxa') returning id, status`;
+  const report = (reporter: string, type: string, targetId: number | null, author: string, reason = "spam", message: string | null = null) =>
+    as("service_role", null, INSERT, [reporter, type, targetId, author, reason, message]);
+  let review: number;
+
+  beforeAll(async () => {
+    const [{ id: book }] = await q1<{ id: number }>(`insert into public.books (slug, title, source) values ('shikoyat-kitob', 'Shikoyat', 'mutolaa') returning id`);
+    [{ id: review }] = await q1<{ id: number }>(
+      `insert into public.user_books (user_id, book_id, status, review) values ($1, $2, 'read', 'Reklama: arzon kitoblar!') returning id`,
+      [A, book],
+    );
+  });
+
+  it("navbat faqat service role uchun (app/actions/reports.ts, lib/admin-panel.ts)", async () => {
+    await expectDenied("anon", null, `select * from public.content_reports`);
+    await expectDenied("authenticated", B, `select * from public.content_reports`);
+    await expectDenied("authenticated", B, INSERT, [B, "review", review, A, "spam", null]);
+    await expectDenied("authenticated", A, `update public.content_reports set status = 'dismissed'`);
+    await expectDenied("authenticated", A, `delete from public.content_reports`);
+    const { rows } = await report(B, "review", review, A, "spam", "Reklama tarqatyapti");
+    expect(rows).toEqual([{ id: expect.any(Number), status: "open" }]);
+  });
+
+  it("bir odam bitta narsa ustidan koʻrib chiqilguncha bir marta shikoyat qiladi", async () => {
+    await expect(report(B, "review", review, A, "abuse")).rejects.toThrow(/content_reports_once_idx/);
+    // boshqa odam — mumkin; profil ustidan (target_id boʻsh) ham xuddi shunday bir marta
+    expect((await report(C, "review", review, A)).rows).toHaveLength(1);
+    expect((await report(B, "profile", null, A)).rows).toHaveLength(1);
+    await expect(report(B, "profile", null, A, "other")).rejects.toThrow(/content_reports_once_idx/);
+    // admin yopgach (admin-reports.ts) oʻsha odam yana shikoyat qila oladi
+    await as("service_role", null, `update public.content_reports set status = 'dismissed', resolved_at = now() where target_type = 'review' and target_id = $1`, [review]);
+    expect((await report(B, "review", review, A)).rows).toHaveLength(1);
+  });
+
+  it("notoʻgʻri shikoyat rad etiladi: tur, sabab, uzun izoh, nishon idsi", async () => {
+    await expect(report(C, "book", 1, A)).rejects.toThrow(/check constraint/);
+    await expect(report(C, "club_post", 1, A, "yoqmadi")).rejects.toThrow(/check constraint/);
+    await expect(report(C, "club_post", 1, A, "spam", "x".repeat(501))).rejects.toThrow(/check constraint/);
+    await expect(report(C, "club_post", null, A)).rejects.toThrow(/check constraint/);
+    await expect(report(C, "profile", 5, A)).rejects.toThrow(/check constraint/);
+  });
+
+  it("katalog xatosi haqidagi xabar 'hal qilindi' deb belgilanadi", async () => {
+    const [{ id }] = await q1<{ id: number }>(
+      `insert into public.book_reports (user_id, book_id, message) select $1, id, 'Muallif xato' from public.books where slug = 'shikoyat-kitob' returning id`,
+      [B],
+    );
+    expect(await q1(`select resolved_at from public.book_reports where id = $1`, [id])).toEqual([{ resolved_at: null }]);
+    await expectDenied("authenticated", B, `update public.book_reports set resolved_at = now() where id = $1`, [id]);
+    const done = await as("service_role", null, `update public.book_reports set resolved_at = now() where id = $1 and resolved_at is null returning id`, [id]);
+    expect(done.rows).toHaveLength(1);
+  });
+
+  it("admin_stats: faqat service role; sonlar bazadagiga mos, 14 kunlik roʻyxat", async () => {
+    await expectDenied("anon", null, `select public.admin_stats()`);
+    await expectDenied("authenticated", A, `select public.admin_stats()`);
+    const s = (await as("service_role", null, `select public.admin_stats() as s`)).rows[0].s as Record<string, number> & {
+      signups_by_day: { day: string; count: number }[];
+    };
+    const count = async (sql: string) => Number((await q1<{ n: number }>(`select count(*) as n from ${sql}`))[0].n);
+    expect(s.users_total).toBe(await count(`public.profiles`));
+    expect(s.users_7d).toBe(s.users_total);
+    expect(s.public_profiles).toBe(await count(`public.profiles where is_public`));
+    expect(s.books_total).toBe(await count(`public.books`));
+    expect(s.books_user_total).toBe(await count(`public.books where source = 'user'`));
+    expect(s.shelf_total).toBe(await count(`public.user_books`));
+    expect(s.reviews_total).toBe(await count(`public.user_books where review is not null`));
+    expect(s.clubs_total).toBe(await count(`public.clubs`));
+    expect(s.reports_open).toBe(await count(`public.content_reports where status = 'open'`));
+    expect(s.reports_open).toBe(2);
+    expect(s.book_reports_open).toBe(await count(`public.book_reports where resolved_at is null`));
+    // kamida A — shu blokda javoniga kitob qoʻshgan
+    expect(s.active_7d).toBeGreaterThanOrEqual(1);
+    expect(s.active_30d).toBeGreaterThanOrEqual(s.active_7d);
+    for (const key of ["users_30d", "telegram_linked", "books_user_7d", "shelf_7d", "notes_total", "sessions_7d", "club_posts_7d"]) {
+      expect(typeof s[key], key).toBe("number");
+    }
+    expect(s.signups_by_day).toHaveLength(14);
+    expect(s.signups_by_day.map((d) => d.day)).toEqual([...s.signups_by_day.map((d) => d.day)].sort());
+    // hamma test foydalanuvchilari bugun (Toshkent vaqti bilan) roʻyxatdan oʻtgan
+    expect(s.signups_by_day.at(-1)!.count).toBe(s.users_total);
+    expect(s.signups_by_day.slice(0, -1).every((d) => d.count === 0)).toBe(true);
+  });
+
+  it("014 qayta ishga tushirilsa ham xato bermaydi va huquqlar ochilib qolmaydi", async () => {
+    const f = fs.readdirSync(MIGRATIONS).find((f) => f.endsWith("_moderation_admin.sql"))!;
+    await db.exec(fs.readFileSync(path.join(MIGRATIONS, f), "utf8"));
+    await expectDenied("authenticated", A, `select * from public.content_reports`);
+    await expectDenied("authenticated", A, `select public.admin_stats()`);
+    expect(await q1(`select count(*)::int as n from public.content_reports where status = 'open'`)).toEqual([{ n: 2 }]);
+  });
+});
+
 // app/actions/account.ts: Supabase Auth auth.users dagi yozuvni oʻchiradi — qolgani shu zanjir bilan oʻchishi shart.
 // Yangi jadval foydalanuvchiga "on delete cascade"siz bogʻlansa, hisobni oʻchirish xato beradi — bu test shuni ushlaydi.
 describe("hisobni oʻchirish: auth.users oʻchsa hamma shaxsiy maʼlumot oʻchadi", () => {
@@ -643,6 +740,12 @@ describe("hisobni oʻchirish: auth.users oʻchsa hamma shaxsiy maʼlumot oʻchad
       [otherClub, D],
     );
     await q1(`insert into public.club_posts (club_id, user_id, parent_id, body) values ($1, $2, $3, 'Xayr')`, [otherClub, A, post]);
+    // shikoyatlar: uning ustidan yozilgani va oʻzi yozgani
+    await q1(
+      `insert into public.content_reports (reporter_id, target_type, target_id, target_user_id, reason, snapshot)
+       values ($1, 'review', $2, $3, 'abuse', 'Zoʻr kitob'), ($3, 'review', $4, $1, 'spam', 'Menga ham yoqdi')`,
+      [A, reviewD, D, reviewA],
+    );
 
     await q1(`delete from auth.users where id = $1`, [D]);
   });
@@ -661,6 +764,12 @@ describe("hisobni oʻchirish: auth.users oʻchsa hamma shaxsiy maʼlumot oʻchad
     expect(await q1(`select 1 from public.club_members where club_id = $1`, [ownClub])).toEqual([]);
     expect(await q1(`select 1 from public.review_votes where user_book_id = $1`, [reviewD])).toEqual([]);
     expect(await q1(`select 1 from public.club_posts where club_id = $1 and body = 'Xayr'`, [otherClub])).toEqual([]);
+    // uning ustidan yozilgan shikoyat (matn nusxasi bilan) oʻchadi; oʻzi yozgani qoladi, lekin kim yozgani unutiladi
+    expect(await left("content_reports", "target_user_id")).toBe(0);
+    expect(await left("content_reports", "reporter_id")).toBe(0);
+    expect(await q1(`select reporter_id, status from public.content_reports where target_id = $1 and reason = 'spam' and snapshot = 'Menga ham yoqdi'`, [reviewA])).toEqual([
+      { reporter_id: null, status: "open" },
+    ]);
   });
 
   it("qoʻshgan kitobi katalogda qoladi, boshqalarning maʼlumotiga tegilmaydi", async () => {

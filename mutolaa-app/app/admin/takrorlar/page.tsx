@@ -8,6 +8,7 @@ import { Input } from "@/components/ui/input";
 import { getAdminUser } from "@/lib/admin";
 import { getDuplicatePairs, getPairBySlugs } from "@/lib/admin-books";
 import { uz } from "@/lib/i18n/uz";
+import { AdminNav } from "../admin-nav";
 import { PairCard } from "./pair-card";
 
 export const metadata: Metadata = { title: uz.admin.duplicatesTitle, robots: { index: false } };
@@ -52,7 +53,8 @@ export default function DuplicatesPage(props: PageProps<"/admin/takrorlar">) {
   return (
     <Container className="py-8 sm:py-10">
       <h1 className="font-serif text-3xl font-semibold">{uz.admin.duplicatesTitle}</h1>
-      <p className="mb-6 mt-1 max-w-3xl text-sm text-muted">{uz.admin.duplicatesIntro}</p>
+      <p className="mb-5 mt-1 max-w-3xl text-sm text-muted">{uz.admin.duplicatesIntro}</p>
+      <AdminNav current="duplicates" />
       <Suspense fallback={<div className="h-64 animate-pulse rounded-2xl bg-surface-2" />}>
         <Duplicates searchParams={props.searchParams} />
       </Suspense>

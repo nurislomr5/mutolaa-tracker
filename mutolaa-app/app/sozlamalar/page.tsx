@@ -54,7 +54,7 @@ async function Settings() {
         </Card>
         {admin && (
           <Card>
-            <Link href="/admin/takrorlar" className="text-sm font-medium text-accent hover:underline">
+            <Link href="/admin" className="text-sm font-medium text-accent hover:underline">
               {uz.admin.settingsLink}
             </Link>
           </Card>

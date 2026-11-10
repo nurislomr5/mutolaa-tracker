@@ -2,6 +2,7 @@ import Link from "next/link";
 import { ReviewText } from "@/components/shelf/review-form";
 import { Avatar } from "@/components/social/avatar";
 import { HelpfulButton } from "@/components/social/helpful-button";
+import { ReportButton } from "@/components/social/report-button";
 import { formatDate } from "@/lib/format";
 import { uz } from "@/lib/i18n/uz";
 import { getBookReviews, personName } from "@/lib/social";
@@ -50,8 +51,9 @@ export async function ReadersSection({ bookId, slug }: { bookId: number; slug: s
                   {r.rating && <span className="ml-auto shrink-0 text-sm text-warning">★ {Number(r.rating).toFixed(1)}</span>}
                 </div>
                 <ReviewText review={r.review} isSpoiler={r.isSpoiler} className="mt-3 line-clamp-6 whitespace-pre-line text-sm" />
-                <div className="mt-2 flex items-center justify-between gap-2">
-                  <p className="text-xs text-muted">{formatDate(r.date)}</p>
+                <div className="mt-2 flex flex-wrap items-center gap-x-3 gap-y-2">
+                  <p className="mr-auto text-xs text-muted">{formatDate(r.date)}</p>
+                  {r.review && me && me.id !== r.person.id && <ReportButton type="review" id={r.id} />}
                   {r.review && (
                     <HelpfulButton
                       reviewId={r.id}

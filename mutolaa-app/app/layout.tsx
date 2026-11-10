@@ -1,6 +1,7 @@
 import type { Metadata, Viewport } from "next";
 import { Inter, Literata } from "next/font/google";
 import { Suspense } from "react";
+import { Analytics } from "@/components/analytics";
 import { BottomNav } from "@/components/bottom-nav";
 import { OfflineSyncSlot } from "@/components/offline/offline-sync-slot";
 import { SiteHeader } from "@/components/site-header";
@@ -68,6 +69,9 @@ export default function RootLayout({ children }: LayoutProps<"/">) {
         <PwaSetup />
         <Suspense fallback={null}>
           <OfflineSyncSlot />
+        </Suspense>
+        <Suspense fallback={null}>
+          <Analytics />
         </Suspense>
       </body>
     </html>

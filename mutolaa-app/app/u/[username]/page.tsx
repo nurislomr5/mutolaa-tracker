@@ -6,6 +6,7 @@ import { BookGrid } from "@/components/book/book-card";
 import { ReviewText } from "@/components/shelf/review-form";
 import { Avatar } from "@/components/social/avatar";
 import { FollowButton } from "@/components/social/follow-button";
+import { ReportButton } from "@/components/social/report-button";
 import { Badge } from "@/components/ui/badge";
 import { buttonClasses } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
@@ -46,6 +47,11 @@ async function ProfileView({ params }: { params: PageProps<"/u/[username]">["par
           {data.tasteMatch && (
             <div className="mt-2">
               <Badge tone="accent">🤝 {t.commonBooks(data.tasteMatch.common, data.tasteMatch.pct)}</Badge>
+            </div>
+          )}
+          {data.isLoggedIn && !data.isSelf && (
+            <div className="mt-2 flex flex-wrap items-center gap-2">
+              <ReportButton type="profile" id={profile.id} label={uz.report.profile} />
             </div>
           )}
         </div>
