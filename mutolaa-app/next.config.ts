@@ -29,13 +29,12 @@ const nextConfig: NextConfig = {
   cacheComponents: true,
   partialPrefetching: true,
   images: {
-    // Mutolaa muqovalari o'z CDN'idan olinadi, biz ularni ko'chirmaymiz
+    // Muqovalar manbaning o'z serveridan olinadi, biz ularni ko'chirmaymiz. Bu ro'yxat /_next/image orqali olish mumkin
+    // bo'lgan manbalar: ulashiladigan rasmga (canvas) muqova chizish uchun kerak — lib/share-image.ts dagi COVER_PROXY_HOSTS bilan bir xil
     remotePatterns: [
-      {
-        protocol: "https",
-        hostname: "cdn-minio.mutolaa.com",
-        pathname: "/media/**",
-      },
+      { protocol: "https", hostname: "cdn-minio.mutolaa.com", pathname: "/media/**" },
+      { protocol: "https", hostname: "assets.asaxiy.uz", pathname: "/product/**" },
+      { protocol: "https", hostname: "hilolnashr.uz", pathname: "/image/**" },
     ],
   },
   turbopack: {

@@ -5,6 +5,8 @@ import { Suspense } from "react";
 import { BookForm } from "@/components/book/book-form";
 import { Card } from "@/components/ui/card";
 import { Container } from "@/components/ui/container";
+import { getAdminUser } from "@/lib/admin";
+import { canEditBook } from "@/lib/book-edit";
 import type { BookFormValues } from "@/lib/book-input";
 import { getPublishers } from "@/lib/catalog";
 import { uz } from "@/lib/i18n/uz";
@@ -25,7 +27,8 @@ async function EditForm({ params }: { params: PageProps<"/kitob/[slug]/tahrirlas
     .eq("slug", slug)
     .maybeSingle();
   if (!book) notFound();
-  if (book.source !== "user" || book.created_by !== user.id) {
+  const own = canEditBook(book, user.id, false);
+  if (!own && !(await getAdminUser())) {
     return (
       <p className="text-muted">
         {uz.editBook.forbidden}{" "}
@@ -48,7 +51,12 @@ async function EditForm({ params }: { params: PageProps<"/kitob/[slug]/tahrirlas
     description: book.description ?? "",
   };
   const publishers = (await getPublishers()).map((p) => p.name);
-  return <BookForm mode="edit" slug={slug} initial={initial} publishers={publishers} />;
+  return (
+    <>
+      {!own && <p className="mb-5 rounded-lg bg-accent-soft p-3 text-sm">{uz.editBook.adminNote}</p>}
+      <BookForm mode="edit" slug={slug} initial={initial} publishers={publishers} />
+    </>
+  );
 }
 
 export default function EditBookPage(props: PageProps<"/kitob/[slug]/tahrirlash">) {

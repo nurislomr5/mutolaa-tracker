@@ -15,6 +15,7 @@ export default function robots(): MetadataRoute.Robots {
         "/klublar/taklif/",
         "/qaydlar",
         "/statistika",
+        "/sarhisob",
         "/sozlamalar",
         "/lenta",
         "/skaner",

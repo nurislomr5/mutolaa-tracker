@@ -1,5 +1,6 @@
 import Link from "next/link";
 import { ReportBookIssue } from "@/components/book/report-issue";
+import { ShareImageButton } from "@/components/share/share-dialog";
 import { CustomShelves } from "@/components/shelf/custom-shelves";
 import { NoteForm, NoteItem } from "@/components/shelf/notes";
 import { ProgressForm, ReadingSessionList } from "@/components/shelf/progress-form";
@@ -8,10 +9,13 @@ import { ReviewForm } from "@/components/shelf/review-form";
 import { StatusPicker } from "@/components/shelf/status-picker";
 import { buttonClasses } from "@/components/ui/button";
 import { Card, CardTitle } from "@/components/ui/card";
+import { getAdminUser } from "@/lib/admin";
+import { canEditBook } from "@/lib/book-edit";
 import type { BookDetail } from "@/lib/catalog";
 import { formatDate } from "@/lib/format";
 import { uz } from "@/lib/i18n/uz";
-import { getBookShelfState } from "@/lib/shelf";
+import { getBookShelfState, getProfile } from "@/lib/shelf";
+import { site } from "@/lib/site";
 import { getSessionUser } from "@/lib/supabase/server";
 
 // Sarlavha ostidagi holat tugmalari (mehmon uchun — kirish havolasi)
@@ -28,11 +32,11 @@ export async function ShelfActions({ book }: { book: BookDetail }) {
   return <StatusPicker bookId={book.id} userBookId={userBook?.id} status={userBook?.status} />;
 }
 
-// Foydalanuvchi qoʻshgan kitob — faqat uni qoʻshgan odamga "Tahrirlash" havolasi
+// "Tahrirlash" havolasi: kitobni qoʻshgan odamga va adminga (admin — har qanday kitobda)
 export async function EditBookLink({ book }: { book: BookDetail }) {
-  if (book.source !== "user" || !book.created_by) return null;
   const user = await getSessionUser();
-  if (user?.id !== book.created_by) return null;
+  if (!user) return null;
+  if (!canEditBook(book, user.id, false) && !(await getAdminUser())) return null;
   return (
     <Link href={`/kitob/${book.slug}/tahrirlash`} className="text-sm text-accent hover:underline">
       ✎ {uz.editBook.link}
@@ -60,7 +64,7 @@ export async function ReportIssueSlot({ book }: { book: BookDetail }) {
 export async function MyBookSection({ book }: { book: BookDetail }) {
   const user = await getSessionUser();
   if (!user) return null;
-  const { userBook, notes, shelves, shelfIds, sessions } = await getBookShelfState(book.id);
+  const [{ userBook, notes, shelves, shelfIds, sessions }, profile] = await Promise.all([getBookShelfState(book.id), getProfile()]);
   if (!userBook) return null;
   const t = uz.shelf;
   const audioMinutes = book.audio_seconds ? Math.ceil(book.audio_seconds / 60) : null;
@@ -94,6 +98,22 @@ export async function MyBookSection({ book }: { book: BookDetail }) {
           <div className="mt-3">
             <ReviewForm userBookId={userBook.id} review={userBook.review} isSpoiler={userBook.review_is_spoiler} />
           </div>
+          {userBook.review && (
+            <ShareImageButton
+              card={{
+                kind: "review",
+                text: userBook.review,
+                rating: userBook.rating,
+                book: { title: book.title, author: book.author_names, cover: book.cover_url },
+                reader: profile?.display_name || profile?.username,
+              }}
+              fileName={`${site.slug}-taqriz.png`}
+              shareTitle={uz.share.reviewTitle(book.title)}
+              className="mt-3 text-xs text-muted hover:text-accent"
+            >
+              {uz.share.reviewButton}
+            </ShareImageButton>
+          )}
         </div>
       </Card>
 
@@ -104,7 +124,7 @@ export async function MyBookSection({ book }: { book: BookDetail }) {
           {notes.length > 0 ? (
             <ul className="space-y-3">
               {notes.map((n) => (
-                <NoteItem key={n.id} note={n} book={{ slug: book.slug, title: book.title }} />
+                <NoteItem key={n.id} note={n} book={{ slug: book.slug, title: book.title, author_names: book.author_names, cover_url: book.cover_url }} />
               ))}
             </ul>
           ) : (

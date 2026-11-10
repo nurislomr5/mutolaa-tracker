@@ -92,19 +92,20 @@ export async function getShelves(): Promise<Shelf[]> {
   }));
 }
 
-export type NoteWithBook = Note & { book: { slug: string; title: string } };
+export type NoteBook = { slug: string; title: string; author_names: string | null; cover_url: string | null };
+export type NoteWithBook = Note & { book: NoteBook };
 
 export async function getNotes({ type, openOnly, q }: { type?: NoteType; openOnly?: boolean; q?: string }) {
   const supabase = await createServerSupabase();
   let query = supabase
     .from("notes")
-    .select("id, user_book_id, type, reference_point, content, answer, is_resolved, created_at, user_books!inner(books!inner(slug, title))")
+    .select("id, user_book_id, type, reference_point, content, answer, is_resolved, created_at, user_books!inner(books!inner(slug, title, author_names, cover_url))")
     .order("created_at", { ascending: false });
   if (type) query = query.eq("type", type);
   if (openOnly) query = query.eq("type", "savol").eq("is_resolved", false);
   const { data, error } = await query;
   if (error) throw new Error(`Qaydlar: ${error.message}`);
-  const items = ((data ?? []) as unknown as (Note & { user_books: { books: { slug: string; title: string } } })[]).map(
+  const items = ((data ?? []) as unknown as (Note & { user_books: { books: NoteBook } })[]).map(
     ({ user_books, ...n }) => ({ ...n, book: user_books.books }),
   );
   const norm = uzNormalize(q);
