@@ -94,13 +94,31 @@ export async function getCatalog({ q = "", topic, publisher, format, script, siz
 
   const db = createPublicClient();
   // RPC natijasini PostgREST faqat select'dagi ustunlar boʻyicha saralay oladi
-  const sortColumns = `${CARD_COLUMNS}, mutolaa_rating_count, mutolaa_reading_count, search_text, first_seen_at, published_year`;
-  let columns = sortColumns;
+  let columns = `${CARD_COLUMNS}, mutolaa_rating_count, mutolaa_reading_count, search_text, first_seen_at, published_year`;
   if (topic) columns += ", book_topics!inner(topics!inner(slug))";
-  // nashriyot, til va "sotuvda bor" — search_catalog ichida (nashriyot kitobning nashrlari orqali ham)
-  let query = db
-    .rpc("search_catalog", { q, p_publisher: publisher ?? null, p_lang: lang ?? null, p_in_stock: Boolean(inStock) }, { count: "exact" })
-    .select(columns);
+
+  // Qidiruv soʻzi boʻlmasa (katalogni varaqlash, nashriyot sahifasi) — toʻgʻridan-toʻgʻri jadvaldan:
+  // search_catalog har chaqiruvda mos kelgan barcha kitoblarni toʻliq satrlari bilan yigʻib saralaydi (~0,7 s),
+  // bir vaqtda kelgan bir nechta soʻrov esa bazaning 3 soniyalik chegarasidan oshib ketardi.
+  const browsing = !q.trim();
+  let query;
+  if (browsing) {
+    const publisherId = publisher ? (await getPublisher(publisher))?.id : undefined;
+    if (publisher && !publisherId) return { books: [], total: 0 };
+    // nashriyot: kitobning oʻzi yoki biror nashri orqali; til va "sotuvda bor" — bitta nashrga tegishli
+    if (publisherId) columns += ", by_publisher:book_sources(id)";
+    if (lang || inStock) columns += ", edition:book_sources!inner(id)";
+    query = db.from("books").select(columns, { count: "exact" });
+    if (publisherId)
+      query = query.eq("by_publisher.publisher_id", publisherId).or(`publisher_id.eq.${publisherId},by_publisher.not.is.null`);
+    if (lang) query = query.contains("edition.langs", [lang]);
+    if (inStock) query = query.is("edition.in_stock", true);
+  } else {
+    // nashriyot, til va "sotuvda bor" — search_catalog ichida (nashriyot kitobning nashrlari orqali ham)
+    query = db
+      .rpc("search_catalog", { q, p_publisher: publisher ?? null, p_lang: lang ?? null, p_in_stock: Boolean(inStock) }, { count: "exact" })
+      .select(columns);
+  }
 
   if (topic) query = query.eq("book_topics.topics.slug", topic);
   if (format) query = query.contains("formats", [format]);
@@ -109,8 +127,9 @@ export async function getCatalog({ q = "", topic, publisher, format, script, siz
   if (size === "medium") query = query.gte("page_count", 200).lte("page_count", 400);
   if (size === "long") query = query.gt("page_count", 400);
 
-  // relevance — search_books oʻzi tartiblaydi (qidiruv boʻlmasa mashhurlik boʻyicha)
-  if (sort === "popular") query = query.order("mutolaa_reading_count", { ascending: false, nullsFirst: false });
+  // relevance — search_catalog oʻzi tartiblaydi; qidiruvsiz esa mashhurlik boʻyicha
+  if (sort === "popular" || (browsing && (!sort || sort === "relevance")))
+    query = query.order("mutolaa_reading_count", { ascending: false, nullsFirst: false });
   if (sort === "rating")
     query = query
       .order("mutolaa_rating", { ascending: false, nullsFirst: false })
@@ -122,14 +141,19 @@ export async function getCatalog({ q = "", topic, publisher, format, script, siz
       .order("first_seen_at", { ascending: false });
   // search_text — tirnoq va belgilarsiz, kichik harfli nom: «Naqadar…» N harfida turadi
   if (sort === "title") query = query.order("search_text", { ascending: true });
+  // teng qiymatlarda sahifalar orasida kitob takrorlanmasin yoki tushib qolmasin
+  if (browsing || sort) query = query.order("id");
 
   const from = (page - 1) * PAGE_SIZE;
   const { data, count, error } = await query.range(from, from + PAGE_SIZE - 1);
   // sahifa raqami juda katta boʻlsa PostgREST 416 qaytaradi — boʻsh natija sifatida koʻrsatamiz
   if (error && error.code !== "PGRST103") fail("Katalog", error.message);
   // filtr uchun qoʻshilgan bogʻlanish ustunlarini kartochkaga uzatmaymiz
-  const books = ((data ?? []) as unknown as (BookCardData & { book_topics?: unknown })[]).map((b) => {
+  type Row = BookCardData & { book_topics?: unknown; by_publisher?: unknown; edition?: unknown };
+  const books = ((data ?? []) as unknown as Row[]).map((b) => {
     delete b.book_topics;
+    delete b.by_publisher;
+    delete b.edition;
     return b as BookCardData;
   });
   return { books, total: count ?? 0 };

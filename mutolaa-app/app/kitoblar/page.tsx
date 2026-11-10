@@ -82,6 +82,8 @@ function Chip({ href, active, children }: { href: string; active: boolean; child
   return (
     <Link
       href={href}
+      // filtrlar oʻnlab: har biri oldindan yuklansa, bitta tashrif bazaga oʻnlab soʻrov yuboradi
+      prefetch={false}
       className={cn(
         "inline-flex shrink-0 items-center gap-1.5 rounded-full border px-3 py-1 text-sm transition-colors",
         active ? "border-accent bg-accent text-accent-fg" : "border-border bg-surface text-muted hover:text-text",

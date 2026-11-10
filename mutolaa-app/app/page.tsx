@@ -87,6 +87,7 @@ async function Popular() {
               <Link
                 key={p.slug}
                 href={`/nashriyot/${p.slug}`}
+                prefetch={false}
                 className="rounded-full border border-border bg-surface px-3 py-1 text-sm text-muted transition-colors hover:text-text"
               >
                 {p.name} <span className="text-xs opacity-70">{p.count}</span>

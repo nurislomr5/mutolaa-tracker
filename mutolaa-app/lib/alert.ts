@@ -13,8 +13,9 @@ export async function sendAlert(key: string, title: string, lines: string[]) {
   const token = (process.env.TELEGRAM_BOT_TOKEN ?? "").trim();
   if (!chatId || !token) return;
 
-  const now = Date.now();
-  if ((recent.get(key) ?? 0) > now - THROTTLE_MS) return;
+  // performance.now(): Date.now() ni Next.js prerender paytida "beqaror qiymat" deb rad etadi
+  const now = performance.now();
+  if ((recent.get(key) ?? -Infinity) > now - THROTTLE_MS) return;
   recent.set(key, now);
   if (recent.size > 500) recent.delete(recent.keys().next().value!);
 
