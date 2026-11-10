@@ -802,6 +802,162 @@ describe("20261114000016: tanishuv, tavsiyalar va oʻxshash kitoblar", () => {
   });
 });
 
+describe("20261115000017: bildirishnomalar va haftalik xulosa", () => {
+  const q1 = async <T = Record<string, unknown>>(sql: string, params: unknown[] = []) => (await db.query<T>(sql, params)).rows;
+  const G = "00000000-0000-0000-0000-0000000000a1"; // ochiq profil — bildirishnoma oluvchi
+  const H = "00000000-0000-0000-0000-0000000000a2"; // yopiq profil
+  const I = "00000000-0000-0000-0000-0000000000a3"; // ochiq profil
+  let book: number, review: number, club: number, clubSlug: string;
+  const list = async (user: string, columns = "kind, unread, n, actor_name, actor_username, book_slug, club_slug") =>
+    (await as("authenticated", user, `select ${columns} from public.my_notifications()`)).rows;
+  const unread = async (user: string) => (await as("authenticated", user, `select public.unread_notifications_count() as n`)).rows[0].n;
+
+  beforeAll(async () => {
+    await q1(
+      `insert into auth.users (id, email, raw_user_meta_data) values
+         ($1, 'g@x.test', '{"full_name":"Gulnoza"}'), ($2, 'h@x.test', '{"full_name":"Hasan"}'), ($3, 'i@x.test', '{"full_name":"Ilhom"}')`,
+      [G, H, I],
+    );
+    await q1(`update public.profiles set username = 'gulnoza', is_public = true where id = $1`, [G]);
+    await q1(`update public.profiles set username = 'ilhom', is_public = true where id = $1`, [I]);
+    [{ id: book }] = await q1<{ id: number }>(`insert into public.books (slug, title, source) values ('bn-kitob', 'Bildirishnoma kitobi', 'mutolaa') returning id`);
+    [{ id: review }] = await q1<{ id: number }>(
+      `insert into public.user_books (user_id, book_id, status, review) values ($1, $2, 'read', 'Oʻqishga arziydi') returning id`,
+      [G, book],
+    );
+  });
+
+  it("yangi kuzatuvchi: profili ochiq boʻlsa ismi koʻrinadi, yopiq boʻlsa — yoʻq; qayta kuzatish takrorlamaydi", async () => {
+    await as("authenticated", H, `insert into public.follows (following_id) values ($1)`, [G]);
+    await as("authenticated", I, `insert into public.follows (following_id) values ($1)`, [G]);
+    await as("authenticated", I, `delete from public.follows where following_id = $1`, [G]);
+    await as("authenticated", I, `insert into public.follows (following_id) values ($1)`, [G]);
+    expect(await list(G, "kind, unread, n, actor_name, actor_username")).toEqual([
+      { kind: "follow", unread: true, n: 1, actor_name: "Ilhom", actor_username: "ilhom" },
+      { kind: "follow", unread: true, n: 1, actor_name: null, actor_username: null },
+    ]);
+    expect(await unread(G)).toBe(2);
+    expect(await list(H)).toEqual([]);
+  });
+
+  it("jadval toʻliq yopiq: faqat funksiyalar orqali, mehmonga ular ham yopiq", async () => {
+    await expectDenied("authenticated", G, `select * from public.notifications`);
+    await expectDenied("authenticated", G, `insert into public.notifications (user_id, kind) values ($1, 'weekly')`, [H]);
+    await expectDenied("authenticated", G, `update public.notifications set read_at = null`);
+    await expectDenied("anon", null, `select * from public.notifications`);
+    await expectDenied("anon", null, `select * from public.my_notifications()`);
+    await expectDenied("anon", null, `select public.unread_notifications_count()`);
+    await expectDenied("anon", null, `select public.mark_notifications_read()`);
+    await expectDenied("authenticated", G, `select public.notify_new_books()`);
+    await expectDenied("authenticated", G, `select public.notify_weekly_summary('2025-06-02')`);
+  });
+
+  it("'Foydali' ovozi: kim bergani aytilmaydi, bir kunlik ovozlar bittaga yigʻiladi", async () => {
+    await as("authenticated", H, `insert into public.review_votes (user_book_id) values ($1)`, [review]);
+    await as("authenticated", I, `insert into public.review_votes (user_book_id) values ($1)`, [review]);
+    // ovozni qaytarib olib yana berish yangi bildirishnoma yaratmaydi
+    await as("authenticated", I, `delete from public.review_votes where user_book_id = $1`, [review]);
+    await as("authenticated", I, `insert into public.review_votes (user_book_id) values ($1)`, [review]);
+    const rows = await list(G, "kind, n, actor_name, actor_username, actor_avatar, book_slug, book_title");
+    expect(rows[0]).toEqual({ kind: "helpful", n: 2, actor_name: null, actor_username: null, actor_avatar: null, book_slug: "bn-kitob", book_title: "Bildirishnoma kitobi" });
+    expect(rows).toHaveLength(3);
+    expect(await unread(G)).toBe(3);
+  });
+
+  it("oʻqildi deb belgilash faqat oʻzinikiga taʼsir qiladi", async () => {
+    await as("authenticated", H, `select public.mark_notifications_read()`);
+    expect(await unread(G)).toBe(3);
+    await as("authenticated", G, `select public.mark_notifications_read()`);
+    expect(await unread(G)).toBe(0);
+    expect((await list(G, "unread")).every((r) => r.unread === false)).toBe(true);
+  });
+
+  it("klub: yangi mavzu aʼzolarga (kun boʻyicha yigʻiladi), javob — muallifiga ismi bilan; chiqib ketganda tozalanadi", async () => {
+    clubSlug = (await as("authenticated", G, `select public.create_club('Bildirishnoma klubi', null, true) as s`)).rows[0].s as string;
+    [{ id: club }] = await q1<{ id: number }>(`select id from public.clubs where slug = $1`, [clubSlug]);
+    await as("authenticated", H, `insert into public.club_members (club_id) values ($1)`, [club]);
+    await as("authenticated", I, `insert into public.club_members (club_id) values ($1)`, [club]);
+    const post = (await as("authenticated", G, `insert into public.club_posts (club_id, body) values ($1, 'Birinchi mavzu') returning id`, [club])).rows[0].id;
+    await as("authenticated", G, `insert into public.club_posts (club_id, body) values ($1, 'Ikkinchi mavzu')`, [club]);
+    expect(await list(H)).toEqual([{ kind: "club_post", unread: true, n: 2, actor_name: null, actor_username: null, book_slug: null, club_slug: clubSlug }]);
+    expect(await unread(H)).toBe(1);
+    expect(await list(G)).toHaveLength(3); // oʻz xabari haqida oʻziga yozilmaydi
+
+    // yopiq profilli aʼzoning javobi: ismi koʻrinadi (klub ichida), profil havolasi yoʻq
+    const reply = (await as("authenticated", H, `insert into public.club_posts (club_id, parent_id, body) values ($1, $2, 'Qoʻshilaman') returning id`, [club, post])).rows[0].id;
+    expect((await list(G, "kind, unread, actor_name, actor_username, club_slug, post_id"))[0]).toEqual({
+      kind: "club_reply", unread: true, actor_name: "Hasan", actor_username: null, club_slug: clubSlug, post_id: reply,
+    });
+    expect(await list(I, "kind, n")).toEqual([{ kind: "club_post", n: 2 }]); // javob boshqa aʼzolarga yuborilmaydi
+
+    // javob oʻchsa — bildirishnomasi ham; aʼzo chiqsa — klubga oid bildirishnomalari ham
+    await as("authenticated", H, `delete from public.club_posts where id = $1`, [reply]);
+    expect((await list(G)).map((r) => r.kind)).not.toContain("club_reply");
+    await as("authenticated", H, `delete from public.club_members where club_id = $1 and user_id = $2`, [club, H]);
+    expect(await list(H)).toEqual([]);
+    expect(await q1(`select 1 from public.notifications where user_id = $1`, [H])).toEqual([]);
+    // klub oʻchsa — qolgan aʼzolarniki ham
+    await as("authenticated", G, `delete from public.clubs where id = $1`, [club]);
+    expect(await list(I)).toEqual([]);
+    expect(await q1(`select 1 from public.notifications where club_id = $1`, [club])).toEqual([]);
+  });
+
+  it("notify_new_books: faqat kuzatish boshlangandan keyin qoʻshilgan kitob, bir marta; oʻzi qoʻshgani — yoʻq", async () => {
+    await db.exec(`
+      insert into public.authors (slug, name) values ('bn-muallif', 'Bildirishnoma Muallif');
+      insert into public.publishers (slug, name) values ('bn-nashriyot', 'Bildirishnoma nashriyoti');
+      insert into public.books (slug, title, source, first_seen_at) values ('bn-eski', 'Eski kitob', 'mutolaa', now() - interval '2 days');
+      insert into public.book_authors (book_id, author_id)
+        select b.id, a.id from public.books b, public.authors a where b.slug = 'bn-eski' and a.slug = 'bn-muallif';
+    `);
+    await as("authenticated", G, `insert into public.author_follows (author_id) select id from public.authors where slug = 'bn-muallif'`);
+    await as("authenticated", G, `insert into public.publisher_follows (publisher_id) select id from public.publishers where slug = 'bn-nashriyot'`);
+    await as("authenticated", I, `insert into public.publisher_follows (publisher_id) select id from public.publishers where slug = 'bn-nashriyot'`);
+    expect((await as("service_role", null, `select public.notify_new_books() as n`)).rows[0].n).toBe(0);
+
+    // bitta kitob ham muallif, ham nashriyot orqali mos keladi — baribir bitta bildirishnoma
+    await db.query(
+      `insert into public.books (slug, title, source, publisher_id, created_by)
+       select 'bn-yangi', 'Yangi kitob', 'user', p.id, $1 from public.publishers p where p.slug = 'bn-nashriyot'`,
+      [I],
+    );
+    await db.exec(`
+      insert into public.book_authors (book_id, author_id)
+        select b.id, a.id from public.books b, public.authors a where b.slug = 'bn-yangi' and a.slug = 'bn-muallif';
+    `);
+    expect((await as("service_role", null, `select public.notify_new_books() as n`)).rows[0].n).toBe(1);
+    expect((await as("service_role", null, `select public.notify_new_books() as n`)).rows[0].n).toBe(0);
+    expect((await list(G, "kind, unread, n, book_slug, book_title"))[0]).toEqual({ kind: "new_book", unread: true, n: 1, book_slug: "bn-yangi", book_title: "Yangi kitob" });
+    expect(await list(I)).toEqual([]); // kitobni oʻzi qoʻshgan
+  });
+
+  it("notify_weekly_summary: shu haftada (Toshkent vaqti, dushanba–yakshanba) oʻqiganlarga, bir marta", async () => {
+    const [{ id: ubI }] = await q1<{ id: number }>(`insert into public.user_books (user_id, book_id, status) values ($1, $2, 'reading') returning id`, [I, book]);
+    await q1(
+      `insert into public.reading_sessions (user_id, user_book_id, delta, new_value, created_at) values
+         ($1, $2, 10, 10, '2025-06-08T23:30:00+05:00'),
+         ($3, $4, 10, 10, '2025-06-09T00:30:00+05:00')`,
+      [G, review, I, ubI],
+    );
+    expect((await as("service_role", null, `select public.notify_weekly_summary('2025-06-02') as n`)).rows[0].n).toBe(1);
+    expect((await as("service_role", null, `select public.notify_weekly_summary('2025-06-02') as n`)).rows[0].n).toBe(0);
+    expect((await list(G, "kind, unread, ref_date::text as week"))[0]).toEqual({ kind: "weekly", unread: true, week: "2025-06-02" });
+    expect(await list(I)).toEqual([]);
+    expect(await unread(G)).toBe(2);
+  });
+
+  it("017 qayta ishga tushirilsa: xato yoʻq, huquqlar yopiq, triggerlar ikkilanmaydi", async () => {
+    const f = fs.readdirSync(MIGRATIONS).find((f) => f.endsWith("_notifications.sql"))!;
+    await db.exec(fs.readFileSync(path.join(MIGRATIONS, f), "utf8"));
+    await expectDenied("authenticated", G, `select * from public.notifications`);
+    await expectDenied("anon", null, `select * from public.my_notifications()`);
+    await expectDenied("authenticated", G, `select public.notify_new_books()`);
+    await as("authenticated", G, `insert into public.follows (following_id) values ($1)`, [I]);
+    expect(await list(I, "kind, n, actor_name")).toEqual([{ kind: "follow", n: 1, actor_name: "Gulnoza" }]);
+    expect(await q1(`select 1 from public.notifications where user_id = $1`, [I])).toHaveLength(1);
+  });
+});
+
 // app/actions/account.ts: Supabase Auth auth.users dagi yozuvni oʻchiradi — qolgani shu zanjir bilan oʻchishi shart.
 // Yangi jadval foydalanuvchiga "on delete cascade"siz bogʻlansa, hisobni oʻchirish xato beradi — bu test shuni ushlaydi.
 describe("hisobni oʻchirish: auth.users oʻchsa hamma shaxsiy maʼlumot oʻchadi", () => {
@@ -855,6 +1011,10 @@ describe("hisobni oʻchirish: auth.users oʻchsa hamma shaxsiy maʼlumot oʻchad
       [A, reviewD, D, reviewA],
     );
 
+    // triggerlar yozgan bildirishnomalar: unga kelgani va u sababchi boʻlgani
+    expect((await q1(`select 1 from public.notifications where user_id = $1`, [D])).length).toBeGreaterThan(0);
+    expect((await q1(`select 1 from public.notifications where actor_id = $1`, [D])).length).toBeGreaterThan(0);
+
     await q1(`delete from auth.users where id = $1`, [D]);
   });
 
@@ -864,6 +1024,9 @@ describe("hisobni oʻchirish: auth.users oʻchsa hamma shaxsiy maʼlumot oʻchad
     for (const table of ["user_books", "reading_sessions", "notes", "shelves", "activities", "telegram_accounts", "telegram_link_tokens", "book_reports", "review_votes", "club_members", "club_posts", "profile_topics"]) {
       expect(await left(table), table).toBe(0);
     }
+    // bildirishnomalar: unga kelgani ham, u sababchi boʻlgani ham (kuzatish, ovoz, klubdagi xabarlar)
+    expect(await left("notifications")).toBe(0);
+    expect(await left("notifications", "actor_id")).toBe(0);
     expect(await left("follows", "follower_id")).toBe(0);
     expect(await left("follows", "following_id")).toBe(0);
     expect(await left("clubs", "owner_id")).toBe(0);

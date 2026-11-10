@@ -1,5 +1,5 @@
 import { NextResponse, type NextRequest } from "next/server";
-import { runReminders } from "@/lib/bot/reminders";
+import { runReminders, runSiteNotifications } from "@/lib/bot/reminders";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { safeEqual } from "@/lib/safe-equal";
 
@@ -14,9 +14,16 @@ export async function POST(req: NextRequest) {
   }
   const params = req.nextUrl.searchParams;
   const hour = params.has("soat") ? Number(params.get("soat")) : undefined;
-  const report = await runReminders(createAdminClient(), {
+  const opts = {
     dryRun: params.get("dry") === "1",
     hour: hour !== undefined && Number.isInteger(hour) && hour >= 0 && hour <= 23 ? hour : undefined,
+  };
+  const db = createAdminClient();
+  // saytdagi bildirishnomalar Telegram eslatmalariga bogʻliq emas — biri yiqilsa ikkinchisi ishlayversin
+  const site = await runSiteNotifications(db, opts).catch((e) => {
+    console.error("[bildirishnomalar]", e);
+    return { newBooks: null, weekly: null };
   });
-  return NextResponse.json({ ok: true, count: report.length, report });
+  const report = await runReminders(db, opts);
+  return NextResponse.json({ ok: true, count: report.length, site, report });
 }

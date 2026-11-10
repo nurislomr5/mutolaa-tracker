@@ -3,7 +3,7 @@ import { NextResponse, type NextRequest } from "next/server";
 import { canonicalRedirect } from "@/lib/site";
 
 // Faqat kirgan foydalanuvchilar uchun sahifalar
-const PROTECTED = ["/klublar/yangi", "/javonim", "/kitob-qoshish", "/skaner", "/lenta", "/qaydlar", "/statistika", "/sozlamalar", "/tanishuv"];
+const PROTECTED = ["/klublar/yangi", "/javonim", "/kitob-qoshish", "/skaner", "/lenta", "/qaydlar", "/statistika", "/sozlamalar", "/tanishuv", "/bildirishnomalar", "/hafta"];
 
 // Har bir soʻrovda Supabase sessiyasini yangilaydi va himoyalangan sahifalarga mehmonni /kirish ga yuboradi.
 // Bu faqat optimistik tekshiruv — haqiqiy ruxsat RLS va server action'lardagi getSessionUser() da.

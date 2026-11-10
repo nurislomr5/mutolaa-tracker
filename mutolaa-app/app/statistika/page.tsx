@@ -90,6 +90,11 @@ async function StatsView({ searchParams }: { searchParams: PageProps<"/statistik
       <div className="mb-6 flex flex-wrap items-center justify-between gap-3">
         <p className="text-muted">{t.subtitle(stats.year)}</p>
         <div className="flex flex-wrap items-center gap-2">
+          {stats.isCurrentYear && (
+            <Link href="/hafta" className="mr-1 text-sm text-accent hover:underline">
+              {uz.week.fromStats}
+            </Link>
+          )}
           {hasData && (
             <ShareStatsButton
               year={stats.year}

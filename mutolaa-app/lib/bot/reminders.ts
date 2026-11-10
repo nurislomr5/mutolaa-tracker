@@ -3,6 +3,7 @@ import { FORMAT_ICON, progressLine } from "@/lib/bot/handlers";
 import { appUrl, drawBar, esc, sendMessage, type InlineButton } from "@/lib/bot/telegram";
 import { uz } from "@/lib/i18n/uz";
 import { addDays, computeStreaks, dayKey, TZ } from "@/lib/stats-utils";
+import { summarizeWeek, weeklySummaryDue, weekStartOf } from "@/lib/weekly";
 
 // Har soatda (GitHub Actions -> /api/cron/reminders) ishlaydi. Faqat Telegram bogʻlagan foydalanuvchilarga.
 // Har bir xabar turi kuniga bir marta (profiles.last_*_on), "yangi kitob" — kitob boshiga bir marta (book_notifications).
@@ -113,19 +114,29 @@ export async function runReminders(db: SupabaseClient, opts: { now?: Date; hour?
 
     // 3. Haftalik natija — yakshanba kechqurun
     if (weekday === "Sun" && hour === DIGEST_HOUR && p.weekly_digest && p.last_digest_on !== today) {
-      const weekStart = addDays(today, -6);
-      const week = userSessions.filter((s) => dayKey(s.created_at) >= weekStart);
-      const pages = week.filter((s) => s.user_books.unit === "pages").reduce((n, s) => n + s.delta, 0);
-      const minutes = week.filter((s) => s.user_books.unit === "minutes").reduce((n, s) => n + s.delta, 0);
-      const active = new Set(week.map((s) => dayKey(s.created_at))).size;
+      // saytdagi /hafta sahifasi bilan bir xil hisob: dushanbadan yakshanbagacha
+      const weekStart = weekStartOf(today);
+      const rows = userSessions.map((s) => ({ delta: s.delta, created_at: s.created_at, unit: s.user_books.unit }));
+      const week = summarizeWeek(rows, weekStart);
+      const previous = summarizeWeek(rows, addDays(weekStart, -7));
       const { count: finished } = await db
         .from("user_books")
         .select("id", { count: "exact", head: true })
         .eq("user_id", p.id)
         .eq("status", "read")
         .gte("finished_at", weekStart);
-      const text = active ? t.digest({ pages, minutes, active, finished: finished ?? 0 }) : t.digestEmpty;
-      await deliver(p, "digest", text, [[{ text: uz.bot.openSite, web_app: { url: `${appUrl()}/statistika` } }]], { last_digest_on: today });
+      const text = week.activeDays
+        ? t.digest({
+            pages: week.pages,
+            minutes: week.minutes,
+            active: week.activeDays,
+            finished: finished ?? 0,
+            // oldingi haftada bet oʻqilmagan boʻlsa solishtirish maʼnosiz
+            pagesDiff: previous.pages > 0 ? week.pages - previous.pages : undefined,
+            streak: computeStreaks(days, today).current,
+          })
+        : t.digestEmpty;
+      await deliver(p, "digest", text, [[{ text: uz.bot.openSite, web_app: { url: `${appUrl()}/hafta` } }]], { last_digest_on: today });
     }
   }
 
@@ -177,4 +188,29 @@ export async function runReminders(db: SupabaseClient, opts: { now?: Date; hour?
   }
 
   return report;
+}
+
+// Saytdagi bildirishnomalar (20261115000017): Telegram bogʻlanganidan qatʼi nazar hamma uchun.
+// Ikkala funksiya ham bazada takror yozmaydi, shuning uchun har soatda chaqirish xavfsiz.
+// Xato boʻlsa (masalan, migratsiya hali qoʻllanmagan) — jurnalga yoziladi, Telegram eslatmalari toʻxtamaydi.
+export async function runSiteNotifications(
+  db: SupabaseClient,
+  opts: { now?: Date; hour?: number; dryRun?: boolean } = {},
+): Promise<{ newBooks: number | null; weekly: number | null }> {
+  const result: { newBooks: number | null; weekly: number | null } = { newBooks: null, weekly: null };
+  if (opts.dryRun) return result;
+  const clock = tashkentClock(opts.now ?? new Date());
+  const hour = opts.hour ?? clock.hour;
+
+  const books = await db.rpc("notify_new_books");
+  if (books.error) console.error("[bildirishnomalar] yangi kitoblar:", books.error.message);
+  else result.newBooks = Number(books.data ?? 0);
+
+  const weekStart = weeklySummaryDue(clock.today, hour, DIGEST_HOUR);
+  if (weekStart) {
+    const weekly = await db.rpc("notify_weekly_summary", { p_week_start: weekStart });
+    if (weekly.error) console.error("[bildirishnomalar] haftalik xulosa:", weekly.error.message);
+    else result.weekly = Number(weekly.data ?? 0);
+  }
+  return result;
 }

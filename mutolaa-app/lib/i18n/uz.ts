@@ -1,5 +1,7 @@
 import { site } from "@/lib/site";
 
+const MONTHS_LOWER = ["yanvar", "fevral", "mart", "aprel", "may", "iyun", "iyul", "avgust", "sentabr", "oktabr", "noyabr", "dekabr"];
+
 // Interfeys matnlari (oʻzbek lotin). Kirill varianti keyinroq shu tuzilmada qoʻshiladi.
 export const uz = {
   nav: {
@@ -228,14 +230,18 @@ export const uz = {
     dailyNoBook: "📚 Bugun nima oʻqiymiz? Katalogdan kitob tanlang yoki /qidir buyrugʻidan foydalaning.",
     replyHint: "Javob yozing, masalan: «150-betga keldim» — progress oʻzi yoziladi.",
     streak: (days: number) => `🔥 ${days} kunlik streak'ingiz uzilmasin! Bugun bir necha bet boʻlsa ham oʻqing.`,
-    digest: (s: { pages: number; minutes: number; active: number; finished: number }) =>
+    // pagesDiff — oldingi haftaga nisbatan farq (oldingi hafta bet oʻqilgan boʻlsa), streak — joriy ketma-ket kunlar
+    digest: (s: { pages: number; minutes: number; active: number; finished: number; pagesDiff?: number; streak?: number }) =>
       [
         "📊 <b>Haftalik natija</b>",
         "",
         `📅 Faol kunlar: <b>${s.active}/7</b>`,
-        s.pages ? `📖 Oʻqilgan betlar: <b>${s.pages}</b>` : null,
+        s.pages
+          ? `📖 Oʻqilgan betlar: <b>${s.pages}</b>${s.pagesDiff ? ` (oldingi haftadan ${Math.abs(s.pagesDiff)} bet ${s.pagesDiff > 0 ? "koʻp" : "kam"})` : ""}`
+          : null,
         s.minutes ? `🎧 Tinglangan: <b>${Math.floor(s.minutes / 60)} soat ${s.minutes % 60} daqiqa</b>` : null,
         s.finished ? `✅ Tugatilgan kitoblar: <b>${s.finished}</b>` : null,
+        s.streak && s.streak >= 2 ? `🔥 Streak: <b>${s.streak} kun</b>` : null,
         "",
         "Shunday davom eting! 💪",
       ]
@@ -642,6 +648,56 @@ export const uz = {
     submit: "Davom etish",
     save: "Saqlash",
     skip: "Hozircha oʻtkazib yuborish",
+  },
+  notifications: {
+    title: "Bildirishnomalar",
+    intro: "Oxirgi uch oydagi yangiliklar.",
+    bellUnread: (n: number) => `Bildirishnomalar: ${n} ta yangi`,
+    unreadMark: "Yangi",
+    empty: "Hozircha bildirishnoma yoʻq. Sizni kimdir kuzatsa, taqrizingiz foydali deb belgilansa yoki klubingizda yangi mavzu ochilsa — shu yerda koʻrinadi.",
+    unavailable: "Bildirishnomalarni hozir yuklab boʻlmadi. Birozdan keyin qayta urinib koʻring.",
+    follow: (name: string) => `${name} sizni kuzata boshladi`,
+    followPrivate: "Yopiq profilli kitobxon sizni kuzata boshladi",
+    helpful: (n: number) => (n > 1 ? `Taqrizingizni ${n} kishi foydali deb belgiladi` : "Taqrizingizni bir kitobxon foydali deb belgiladi"),
+    clubPost: (club: string, n: number) => (n > 1 ? `«${club}» klubida ${n} ta yangi mavzu` : `«${club}» klubida yangi mavzu ochildi`),
+    clubReply: (name: string, club: string) => `${name} «${club}» klubida mavzuingizga javob yozdi`,
+    newBook: "Siz kuzatayotgan muallif yoki nashriyotdan yangi kitob",
+    clubMember: "Klub aʼzosi",
+    weekly: "Haftalik xulosangiz tayyor",
+  },
+  week: {
+    title: "Haftalik xulosa",
+    thisWeek: "Shu hafta",
+    prev: "← Oldingi hafta",
+    next: "Keyingi hafta →",
+    current: "Shu haftaga qaytish",
+    activeDays: "Faol kunlar",
+    finished: "Tugatilgan kitoblar",
+    finishedTitle: "Shu haftada tugatilgan kitoblar",
+    daysTitle: "Kunlar boʻyicha",
+    morePages: (n: number) => `Oldingi haftadan ${n} bet koʻp`,
+    lessPages: (n: number) => `Oldingi haftadan ${n} bet kam`,
+    moreMinutes: (n: number) => `Oldingi haftadan ${n} daqiqa koʻp`,
+    lessMinutes: (n: number) => `Oldingi haftadan ${n} daqiqa kam`,
+    moreDays: (n: number) => `Oldingi haftadan ${n} kun koʻp`,
+    lessDays: (n: number) => `Oldingi haftadan ${n} kun kam`,
+    pagesShort: (n: number) => `${n} bet`,
+    minutesShort: (n: number) => `${n} daq`,
+    activeOnly: "oʻqildi",
+    empty: "Bu haftada hali progress yozilmagan. Bir necha bet boʻlsa ham oʻqib, javoningizda belgilab qoʻying.",
+    emptyPast: "Bu haftada progress yozilmagan.",
+    statsLink: "Yillik statistika →",
+    fromStats: "Haftalik xulosa →",
+    weekdays: ["Du", "Se", "Cho", "Pa", "Ju", "Sha", "Yak"],
+    weekdaysLong: ["Dushanba", "Seshanba", "Chorshanba", "Payshanba", "Juma", "Shanba", "Yakshanba"],
+    // "9–15-noyabr, 2026" yoki "30-noyabr – 6-dekabr, 2026"
+    range: (start: string, end: string) => {
+      const [y1, m1, d1] = start.split("-").map(Number);
+      const [y2, m2, d2] = end.split("-").map(Number);
+      if (y1 !== y2) return `${d1}-${MONTHS_LOWER[m1 - 1]}, ${y1} – ${d2}-${MONTHS_LOWER[m2 - 1]}, ${y2}`;
+      if (m1 !== m2) return `${d1}-${MONTHS_LOWER[m1 - 1]} – ${d2}-${MONTHS_LOWER[m2 - 1]}, ${y2}`;
+      return `${d1}–${d2}-${MONTHS_LOWER[m2 - 1]}, ${y2}`;
+    },
   },
   common: {
     error: "Xatolik yuz berdi. Qayta urinib koʻring.",
