@@ -1,4 +1,5 @@
 import { NextResponse, type NextRequest } from "next/server";
+import { afterLoginPath } from "@/lib/onboarding";
 import { safeNext } from "@/lib/safe-next";
 import { createServerSupabase } from "@/lib/supabase/server";
 
@@ -11,7 +12,7 @@ export async function GET(request: NextRequest) {
   if (code) {
     const supabase = await createServerSupabase();
     const { error } = await supabase.auth.exchangeCodeForSession(code);
-    if (!error) return NextResponse.redirect(`${origin}${next}`);
+    if (!error) return NextResponse.redirect(`${origin}${await afterLoginPath(supabase, next)}`);
   }
   return NextResponse.redirect(`${origin}/kirish?xato=havola&next=${encodeURIComponent(next)}`);
 }

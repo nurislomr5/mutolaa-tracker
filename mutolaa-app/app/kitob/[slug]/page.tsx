@@ -9,7 +9,7 @@ import { SOURCE_NAMES, WhereToGet } from "@/components/book/where-to-get";
 import { Badge } from "@/components/ui/badge";
 import { buttonClasses } from "@/components/ui/button";
 import { Container } from "@/components/ui/container";
-import { getAuthor, getBook, getBookRedirect, getPopularBooks, type BookDetail } from "@/lib/catalog";
+import { getAuthor, getBook, getBookRedirect, getCatalog, getPopularBooks, getSimilarBooks, type BookDetail } from "@/lib/catalog";
 import { bookDescription, bookJsonLd } from "@/lib/seo";
 import { formatCount, formatDuration, formatRating } from "@/lib/format";
 import { uz } from "@/lib/i18n/uz";
@@ -66,6 +66,31 @@ async function SameAuthor({ book }: { book: BookDetail }) {
         </Link>
       </div>
       <BookGrid books={others} />
+    </section>
+  );
+}
+
+// Rukn va janri mos kitoblar. Qogʻoz kitoblarning koʻpida rukn yoʻq — ularda shu nashriyotning boshqa kitoblari chiqadi.
+async function Similar({ book }: { book: BookDetail }) {
+  let books = (await getSimilarBooks(book.id, 6)) ?? [];
+  const publisher = book.publisherRef;
+  const byPublisher = books.length === 0 && publisher !== null;
+  if (byPublisher) {
+    const page = await getCatalog({ publisher: publisher.slug, sort: "new", page: 1 });
+    books = page.books.filter((b) => b.slug !== book.slug).slice(0, 6);
+  }
+  if (!books.length) return null;
+  return (
+    <section className="mt-14">
+      <div className="mb-4 flex items-baseline justify-between">
+        <h2 className="font-serif text-xl font-semibold">{byPublisher ? uz.book.samePublisher : uz.book.similar}</h2>
+        {byPublisher && (
+          <Link href={`/nashriyot/${publisher.slug}`} className="text-sm text-accent hover:underline">
+            {publisher.name} →
+          </Link>
+        )}
+      </div>
+      <BookGrid books={books} />
     </section>
   );
 }
@@ -224,6 +249,10 @@ async function BookView({ params }: { params: PageProps<"/kitob/[slug]">["params
 
       <Suspense fallback={null}>
         <SameAuthor book={book} />
+      </Suspense>
+
+      <Suspense fallback={null}>
+        <Similar book={book} />
       </Suspense>
     </>
   );

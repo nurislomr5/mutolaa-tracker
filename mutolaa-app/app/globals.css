@@ -100,3 +100,8 @@ body {
   background: var(--bg);
   color: var(--text);
 }
+
+/* Bosh sahifadagi mehmonlar uchun boʻlimlar: sessiya cookie'si boʻlsa birinchi chizilishdayoq yashiriladi (lib/theme.ts) */
+html[data-auth] .guest-only {
+  display: none;
+}

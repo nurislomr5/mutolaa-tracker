@@ -52,6 +52,13 @@ async function Settings() {
             <InstallAppCard />
           </div>
         </Card>
+        <Card>
+          <CardTitle>{t.interests}</CardTitle>
+          <p className="mb-3 mt-1 text-sm text-muted">{t.interestsHint}</p>
+          <Link href="/tanishuv" className="text-sm font-medium text-accent hover:underline">
+            {t.interestsEdit}
+          </Link>
+        </Card>
         {admin && (
           <Card>
             <Link href="/admin" className="text-sm font-medium text-accent hover:underline">

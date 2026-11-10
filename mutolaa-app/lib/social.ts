@@ -118,8 +118,9 @@ export type FeedItem = {
 
 // now — "2 soat oldin" hisoblash uchun soʻrov vaqti (komponentlar Date.now() chaqirmasin)
 export async function getFeed(scope: "following" | "all", limit = 50): Promise<{ items: FeedItem[]; now: number }> {
-  const now = Date.now();
   const me = await getSessionUser();
+  // soʻrov vaqti sessiya oʻqilgandan keyin olinadi — prerender paytida Date.now() chaqirilmasin
+  const now = Date.now();
   if (!me) return { items: [], now };
   const supabase = await createServerSupabase();
 

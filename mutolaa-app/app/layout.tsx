@@ -9,7 +9,7 @@ import { SiteFooter } from "@/components/site-footer";
 import { TelegramAutoLogin } from "@/components/telegram-auto-login";
 import { PwaSetup } from "@/components/pwa/pwa-setup";
 import { site, siteUrl } from "@/lib/site";
-import { themeInitScript } from "@/lib/theme";
+import { authHintScript, themeInitScript } from "@/lib/theme";
 import "./globals.css";
 
 // latin-ext — oʻ/gʻ (ʻ) harflari uchun, cyrillic — kelajakdagi kirill interfeysi va kirillcha kitob nomlari uchun
@@ -58,7 +58,7 @@ export default function RootLayout({ children }: LayoutProps<"/">) {
       className={`${inter.variable} ${literata.variable} h-full antialiased`}
     >
       <head>
-        <script dangerouslySetInnerHTML={{ __html: themeInitScript }} />
+        <script dangerouslySetInnerHTML={{ __html: themeInitScript + authHintScript }} />
       </head>
       <body className="flex min-h-full flex-col font-sans">
         <TelegramAutoLogin />

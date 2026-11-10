@@ -4,6 +4,7 @@ import { headers } from "next/headers";
 import { redirect } from "next/navigation";
 import { z } from "zod";
 import { uz } from "@/lib/i18n/uz";
+import { afterLoginPath } from "@/lib/onboarding";
 import { safeNext } from "@/lib/safe-next";
 import { createServerSupabase } from "@/lib/supabase/server";
 
@@ -47,7 +48,7 @@ export async function verifyLoginCode(_prev: LoginState, formData: FormData): Pr
   const supabase = await createServerSupabase();
   const { error } = await supabase.auth.verifyOtp({ email, token, type: "email" });
   if (error) return { step: "code", email, error: error.status === 429 ? uz.auth.rateLimit : uz.auth.invalidCode };
-  redirect(next);
+  redirect(await afterLoginPath(supabase, next));
 }
 
 export async function signInWithGoogle(formData: FormData) {

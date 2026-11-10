@@ -695,6 +695,113 @@ describe("20261112000014: shikoyatlar navbati va admin paneli", () => {
   });
 });
 
+describe("20261114000016: tanishuv, tavsiyalar va oʻxshash kitoblar", () => {
+  const q1 = async <T = Record<string, unknown>>(sql: string, params: unknown[] = []) => (await db.query<T>(sql, params)).rows;
+  const E = "00000000-0000-0000-0000-00000000000e";
+  const book: Record<string, number> = {};
+  const topic: Record<string, number> = {};
+  const slugs = (rows: Record<string, unknown>[]) => rows.map((r) => r.slug);
+
+  beforeAll(async () => {
+    await q1(`insert into auth.users (id, email) values ($1, 'e@x.test')`, [E]);
+    await db.exec(`
+      insert into public.topics (name, slug) values ('Fantastika', 'tv-fantastika'), ('Badiiy', 'tv-badiiy'), ('Sport', 'tv-sport');
+      insert into public.genres (name, slug) values ('Qoʻllanma', 'tv-qollanma');
+      insert into public.authors (slug, name) values ('tv-muallif', 'Tavsiya Muallif'), ('tv-boshqa', 'Boshqa Muallif');
+      insert into public.books (slug, title, source, mutolaa_reading_count) values
+        ('tv-asos', 'Asos', 'mutolaa', 10),
+        ('tv-yaqin', 'Yaqin', 'mutolaa', 5),
+        ('tv-uzoq', 'Uzoq', 'mutolaa', 900),
+        ('tv-muallifdosh', 'Muallifdosh', 'mutolaa', 50),
+        ('tv-sport', 'Sport kitobi', 'mutolaa', 1),
+        ('tv-ruknsiz', 'Ruknsiz', 'asaxiy', 1000);
+    `);
+    for (const r of await q1<{ id: number; slug: string }>(`select id, slug from public.books where slug like 'tv-%'`)) book[r.slug] = r.id;
+    for (const r of await q1<{ id: number; slug: string }>(`select id, slug from public.topics where slug like 'tv-%'`)) topic[r.slug] = r.id;
+    // Fantastika — kam uchraydi (3 kitob), Badiiy — deyarli hammasida (4 kitob)
+    await db.exec(`
+      insert into public.book_topics (book_id, topic_id)
+        select b.id, t.id from public.books b, public.topics t
+        where (t.slug = 'tv-fantastika' and b.slug in ('tv-asos', 'tv-yaqin', 'tv-muallifdosh'))
+           or (t.slug = 'tv-badiiy' and b.slug in ('tv-asos', 'tv-yaqin', 'tv-muallifdosh', 'tv-uzoq'))
+           or (t.slug = 'tv-sport' and b.slug = 'tv-sport');
+      insert into public.book_genres (book_id, genre_id)
+        select b.id, g.id from public.books b, public.genres g where g.slug = 'tv-qollanma' and b.slug in ('tv-sport', 'tv-uzoq');
+      insert into public.book_authors (book_id, author_id)
+        select b.id, a.id from public.books b, public.authors a
+        where (a.slug = 'tv-muallif' and b.slug in ('tv-asos', 'tv-muallifdosh')) or (a.slug = 'tv-boshqa' and b.slug = 'tv-ruknsiz');
+    `);
+  });
+
+  it("similar_books: kam uchraydigan rukn mosligi ustun, shu muallifning kitobi chiqmaydi; mehmonga ham ochiq", async () => {
+    const SQL = `select slug from public.similar_books($1, $2)`;
+    // "Uzoq" ancha mashhur, lekin faqat keng tarqalgan rukni mos — pastda turadi
+    expect(slugs((await as("anon", null, SQL, [book["tv-asos"], 12])).rows)).toEqual(["tv-yaqin", "tv-uzoq"]);
+    expect(slugs((await as("authenticated", B, SQL, [book["tv-asos"], 1])).rows)).toEqual(["tv-yaqin"]);
+    // janr orqali ham topiladi; rukni ham, janri ham yoʻq kitobda — boʻsh
+    expect(slugs((await as("anon", null, SQL, [book["tv-sport"], 12])).rows)).toEqual(["tv-uzoq"]);
+    expect((await as("anon", null, SQL, [book["tv-ruknsiz"], 12])).rows).toEqual([]);
+  });
+
+  it("tanishuv holati yopiq ustunda: faqat my_onboarding / save_onboarding orqali", async () => {
+    await expectDenied("anon", null, `select * from public.my_onboarding()`);
+    await expectDenied("anon", null, `select public.save_onboarding('{}'::bigint[], null)`);
+    await expectDenied("authenticated", E, `select onboarded_at from public.profiles where id = $1`, [E]);
+    await expectDenied("authenticated", E, `update public.profiles set onboarded_at = now() where id = $1`, [E]);
+    await expectDenied("authenticated", E, `insert into public.profile_topics (user_id, topic_id) values ($1, $2)`, [E, topic["tv-sport"]]);
+    await expectDenied("anon", null, `select * from public.profile_topics`);
+    expect((await as("authenticated", E, `select * from public.my_onboarding()`)).rows).toEqual([{ onboarded: false, topic_ids: [] }]);
+  });
+
+  it("save_onboarding: ruknlar almashtiriladi, yoʻq rukn tashlab ketiladi, maqsad faqat toʻgʻri boʻlsa yoziladi", async () => {
+    await as("authenticated", E, `select public.save_onboarding($1::bigint[], 24)`, [[topic["tv-fantastika"], topic["tv-sport"], 999999]]);
+    expect((await as("authenticated", E, `select * from public.my_onboarding()`)).rows).toEqual([
+      { onboarded: true, topic_ids: [topic["tv-fantastika"], topic["tv-sport"]].sort((a, b) => a - b) },
+    ]);
+    expect(await q1(`select yearly_goal from public.profiles where id = $1`, [E])).toEqual([{ yearly_goal: 24 }]);
+    // qayta saqlash: roʻyxat toʻliq almashadi; 0 yoki boʻsh maqsad eskisini oʻzgartirmaydi
+    await as("authenticated", E, `select public.save_onboarding($1::bigint[], 0)`, [[topic["tv-fantastika"]]]);
+    await as("authenticated", E, `select public.save_onboarding($1::bigint[], null)`, [[topic["tv-fantastika"]]]);
+    expect((await as("authenticated", E, `select topic_id from public.profile_topics`)).rows).toEqual([{ topic_id: topic["tv-fantastika"] }]);
+    expect(await q1(`select yearly_goal from public.profiles where id = $1`, [E])).toEqual([{ yearly_goal: 24 }]);
+    // boshqa odam uning tanlovini koʻrmaydi
+    expect((await as("authenticated", B, `select topic_id from public.profile_topics`)).rows).toEqual([]);
+    await expect(as("authenticated", E, `select public.save_onboarding($1::bigint[], null)`, [Array.from({ length: 41 }, (_, i) => i + 1)])).rejects.toThrow(/Juda koʻp/);
+  });
+
+  it("recommended_books: tanlangan rukn → javondagi kitoblar → kuzatilgan muallif; javondagilar chiqmaydi", async () => {
+    const SQL = `select slug from public.recommended_books(12)`;
+    await expectDenied("anon", null, SQL);
+    await expectDenied("authenticated", E, `select slug from public.recommend_books_for($1, 12)`, [E]);
+    // hech qanday maʼlumot yoʻq foydalanuvchiga — boʻsh (ilova mashhur kitoblarni koʻrsatadi)
+    expect((await as("authenticated", B, SQL)).rows).toEqual([]);
+    // faqat tanlangan rukn: Fantastika kitoblari, mashhurlik boʻyicha
+    expect(slugs((await as("authenticated", E, SQL)).rows)).toEqual(["tv-muallifdosh", "tv-asos", "tv-yaqin"]);
+    // "Asos"ni oʻqib 5 baho qoʻydi: u roʻyxatdan chiqadi, uning ruknlari ("Badiiy" ham) hisobga kiradi
+    await q1(`insert into public.user_books (user_id, book_id, status, rating) values ($1, $2, 'read', 5)`, [E, book["tv-asos"]]);
+    expect(slugs((await as("authenticated", E, SQL)).rows)).toEqual(["tv-muallifdosh", "tv-yaqin", "tv-uzoq"]);
+    // kuzatilgan muallifning ruknsiz (qogʻoz) kitobi ham tavsiyaga kiradi
+    await q1(`insert into public.author_follows (user_id, author_id) select $1, id from public.authors where slug = 'tv-boshqa'`, [E]);
+    expect(slugs((await as("authenticated", E, SQL)).rows)).toEqual(["tv-muallifdosh", "tv-yaqin", "tv-ruknsiz", "tv-uzoq"]);
+    // bot (lib/bot/handlers.ts) service role bilan
+    expect(slugs((await as("service_role", null, `select slug from public.recommend_books_for($1, 2)`, [E])).rows)).toEqual(["tv-muallifdosh", "tv-yaqin"]);
+  });
+
+  it("016 qayta ishga tushirilsa: xato yoʻq, huquqlar yopiq, javoni bor eski foydalanuvchi tanishuvdan oʻtgan hisoblanadi", async () => {
+    expect((await as("authenticated", A, `select onboarded from public.my_onboarding()`)).rows).toEqual([{ onboarded: false }]);
+    const F = "00000000-0000-0000-0000-00000000000f";
+    await q1(`insert into auth.users (id, email) values ($1, 'f@x.test')`, [F]);
+    const f = fs.readdirSync(MIGRATIONS).find((f) => f.endsWith("_onboarding_recommendations.sql"))!;
+    await db.exec(fs.readFileSync(path.join(MIGRATIONS, f), "utf8"));
+    expect((await as("authenticated", A, `select onboarded from public.my_onboarding()`)).rows).toEqual([{ onboarded: true }]);
+    // javoni boʻsh foydalanuvchi — hali oʻtmagan
+    expect((await as("authenticated", F, `select onboarded from public.my_onboarding()`)).rows).toEqual([{ onboarded: false }]);
+    expect((await as("authenticated", E, `select topic_id from public.profile_topics`)).rows).toHaveLength(1);
+    await expectDenied("anon", null, `select * from public.recommended_books(12)`);
+    await expectDenied("authenticated", E, `delete from public.profile_topics`);
+  });
+});
+
 // app/actions/account.ts: Supabase Auth auth.users dagi yozuvni oʻchiradi — qolgani shu zanjir bilan oʻchishi shart.
 // Yangi jadval foydalanuvchiga "on delete cascade"siz bogʻlansa, hisobni oʻchirish xato beradi — bu test shuni ushlaydi.
 describe("hisobni oʻchirish: auth.users oʻchsa hamma shaxsiy maʼlumot oʻchadi", () => {
@@ -721,6 +828,7 @@ describe("hisobni oʻchirish: auth.users oʻchsa hamma shaxsiy maʼlumot oʻchad
     await q1(`insert into public.telegram_accounts (user_id, telegram_id) values ($1, 900000004)`, [D]);
     await q1(`insert into public.telegram_link_tokens (user_id) values ($1)`, [D]);
     await q1(`insert into public.book_reports (user_id, book_id, message) values ($1, $2, 'Muqova xato')`, [D, book]);
+    await q1(`insert into public.profile_topics (user_id, topic_id) select $1, id from public.topics limit 1`, [D]);
     // obunalar va ovozlar — ikki tomonga
     await q1(`insert into public.follows (follower_id, following_id) values ($1, $2), ($2, $1)`, [D, A]);
     [{ id: reviewA }] = await q1<{ id: number }>(
@@ -753,7 +861,7 @@ describe("hisobni oʻchirish: auth.users oʻchsa hamma shaxsiy maʼlumot oʻchad
   it("foydalanuvchiga tegishli hech narsa qolmaydi", async () => {
     const left = async (table: string, column = "user_id") => (await q1(`select 1 from public.${table} where ${column} = $1`, [D])).length;
     expect(await left("profiles", "id")).toBe(0);
-    for (const table of ["user_books", "reading_sessions", "notes", "shelves", "activities", "telegram_accounts", "telegram_link_tokens", "book_reports", "review_votes", "club_members", "club_posts"]) {
+    for (const table of ["user_books", "reading_sessions", "notes", "shelves", "activities", "telegram_accounts", "telegram_link_tokens", "book_reports", "review_votes", "club_members", "club_posts", "profile_topics"]) {
       expect(await left(table), table).toBe(0);
     }
     expect(await left("follows", "follower_id")).toBe(0);

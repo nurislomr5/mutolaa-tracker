@@ -1,48 +1,16 @@
 import type { Metadata } from "next";
 import Link from "next/link";
 import { Suspense } from "react";
-import { BookCover } from "@/components/book/book-cover";
 import { Avatar } from "@/components/social/avatar";
+import { FeedItemCard } from "@/components/social/feed-item";
 import { Button } from "@/components/ui/button";
 import { Container } from "@/components/ui/container";
 import { Input } from "@/components/ui/input";
-import { timeAgo } from "@/lib/format";
 import { uz } from "@/lib/i18n/uz";
-import { getFeed, personName, searchPublicUsers, type FeedItem } from "@/lib/social";
+import { getFeed, personName, searchPublicUsers } from "@/lib/social";
 import { cn } from "@/lib/utils";
 
 export const metadata: Metadata = { title: uz.social.feedTitle };
-
-function Item({ item, now }: { item: FeedItem; now: number }) {
-  const name = personName(item.person);
-  const t = uz.social;
-  return (
-    <li className="flex gap-3 rounded-2xl border border-border bg-surface p-4">
-      <Link href={`/u/${item.person.username}`} className="shrink-0">
-        <Avatar name={name} src={item.person.avatar_url} size={40} />
-      </Link>
-      <div className="min-w-0 flex-1">
-        <p className="text-sm">
-          <Link href={`/u/${item.person.username}`} className="font-semibold hover:text-accent">
-            {name}
-          </Link>{" "}
-          <span className="text-muted">{t.kind[item.kind]}</span>
-          {item.rating && (item.kind === "rated" || item.kind === "read") ? (
-            <span className="ml-1 text-warning">★ {Number(item.rating).toFixed(1)}</span>
-          ) : null}
-        </p>
-        <Link href={`/kitob/${item.book.slug}`} className="mt-2 flex items-center gap-3 rounded-lg p-1 -m-1 hover:bg-surface-2">
-          <BookCover src={item.book.cover_url} title={item.book.title} sizes="40px" className="w-10 shrink-0" />
-          <span className="min-w-0">
-            <span className="line-clamp-1 text-sm font-medium">{item.book.title}</span>
-            {item.book.author_names && <span className="line-clamp-1 text-xs text-muted">{item.book.author_names}</span>}
-          </span>
-        </Link>
-        <p className="mt-2 text-xs text-muted">{timeAgo(item.created_at, now, t.ago)}</p>
-      </div>
-    </li>
-  );
-}
 
 async function Feed({ searchParams }: { searchParams: PageProps<"/lenta">["searchParams"] }) {
   const sp = await searchParams;
@@ -108,7 +76,7 @@ async function Feed({ searchParams }: { searchParams: PageProps<"/lenta">["searc
       {items.length > 0 ? (
         <ul className="grid gap-3 lg:grid-cols-2">
           {items.map((item) => (
-            <Item key={item.id} item={item} now={now} />
+            <FeedItemCard key={item.id} item={item} now={now} />
           ))}
         </ul>
       ) : (

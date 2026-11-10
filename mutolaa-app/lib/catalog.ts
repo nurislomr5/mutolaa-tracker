@@ -6,7 +6,7 @@ import { createPublicClient } from "@/lib/supabase/public";
 
 export const PAGE_SIZE = 24;
 
-const CARD_COLUMNS = "id, slug, title, author_names, cover_url, formats, mutolaa_rating, audio_seconds, is_premium";
+export const CARD_COLUMNS = "id, slug, title, author_names, cover_url, formats, mutolaa_rating, audio_seconds, is_premium";
 
 export type BookFormat = "ebook" | "audio" | "paper";
 
@@ -62,7 +62,7 @@ export type BookSource = {
 
 export type Publisher = { name: string; slug: string; count: number };
 
-export type Topic = { name: string; slug: string; color: string | null; count: number };
+export type Topic = { id: number; name: string; slug: string; color: string | null; count: number };
 
 export type CatalogSort = "relevance" | "popular" | "rating" | "new" | "title";
 export type BookScript = "latin" | "cyrillic";
@@ -180,11 +180,11 @@ export async function getTopics() {
 
   const { data, error } = await createPublicClient()
     .from("topics")
-    .select("name, slug, color, book_topics(count)")
+    .select("id, name, slug, color, book_topics(count)")
     .order("name");
   if (error) fail("Ruknlar", error.message);
-  return ((data ?? []) as unknown as { name: string; slug: string; color: string | null; book_topics: { count: number }[] }[])
-    .map((t): Topic => ({ name: t.name, slug: t.slug, color: t.color, count: t.book_topics[0]?.count ?? 0 }))
+  return ((data ?? []) as unknown as { id: number; name: string; slug: string; color: string | null; book_topics: { count: number }[] }[])
+    .map((t): Topic => ({ id: t.id, name: t.name, slug: t.slug, color: t.color, count: t.book_topics[0]?.count ?? 0 }))
     .filter((t) => t.count > 0);
 }
 
@@ -321,5 +321,21 @@ export async function getNewPaperBooks(limit: number) {
     .order("first_seen_at", { ascending: false })
     .limit(limit);
   if (error) fail("Yangi kitoblar", error.message);
+  return (data ?? []) as unknown as BookCardData[];
+}
+
+// Kitob sahifasi: rukn va janrlari mos kitoblar (similar_books, 20261114000016). Tartibni funksiya oʻzi beradi.
+// Xato otilmaydi: "use cache" ichidagi xato sahifani build paytida ham yiqitadi, boʻlim esa ixtiyoriy.
+// Xato boʻlsa null qisqa muddatga keshlanadi — baza tuzalgach bir daqiqada oʻzi toʻgʻrilanadi.
+export async function getSimilarBooks(bookId: number, limit = 6): Promise<BookCardData[] | null> {
+  "use cache";
+  cacheTag("catalog");
+  const { data, error } = await createPublicClient().rpc("similar_books", { p_book_id: bookId, p_limit: limit }).select(CARD_COLUMNS);
+  if (error) {
+    console.error("[oʻxshash kitoblar]", error.message);
+    cacheLife("minutes");
+    return null;
+  }
+  cacheLife("hours");
   return (data ?? []) as unknown as BookCardData[];
 }

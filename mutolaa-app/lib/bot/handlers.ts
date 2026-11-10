@@ -232,16 +232,19 @@ async function handlePhoto(db: SupabaseClient, chatId: number, userId: string, f
 }
 
 async function sendRecommendations(db: SupabaseClient, chatId: number, userId: string) {
-  const { data: myBooks } = await db.from("user_books").select("book_id").eq("user_id", userId);
-  const excludeIds = new Set((myBooks ?? []).map((r) => r.book_id as number));
-  const { data } = await db
-    .from("books")
-    .select("id, slug, title, author_names, mutolaa_rating")
-    .order("mutolaa_reading_count", { ascending: false, nullsFirst: false })
-    .limit(40);
-  const candidates = ((data ?? []) as { id: number; slug: string; title: string; author_names: string | null; mutolaa_rating: number | null }[])
-    .filter((b) => !excludeIds.has(b.id))
-    .slice(0, 5);
+  type Candidate = { id: number; slug: string; title: string; author_names: string | null; mutolaa_rating: number | null };
+  const columns = "id, slug, title, author_names, mutolaa_rating";
+  // Saytdagi "Siz uchun" bilan bir xil: tanlangan ruknlar, javon va kuzatilgan mualliflar asosida (20261114000016)
+  const { data: personal, error } = await db.rpc("recommend_books_for", { p_user: userId, p_limit: 5 }).select(columns);
+  if (error) console.error("[bot] tavsiyalar:", error.message);
+  let candidates = (personal ?? []) as Candidate[];
+  if (!candidates.length) {
+    // Maʼlumot kam boʻlsa — javonda yoʻq eng mashhur kitoblar
+    const { data: myBooks } = await db.from("user_books").select("book_id").eq("user_id", userId);
+    const excludeIds = new Set((myBooks ?? []).map((r) => r.book_id as number));
+    const { data } = await db.from("books").select(columns).order("mutolaa_reading_count", { ascending: false, nullsFirst: false }).limit(40);
+    candidates = ((data ?? []) as Candidate[]).filter((b) => !excludeIds.has(b.id)).slice(0, 5);
+  }
   if (!candidates.length) {
     await sendMessage(chatId, t.noReading);
     return "recommend_empty";
