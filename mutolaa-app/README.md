@@ -2,7 +2,7 @@
 
 Oʻzbek tilidagi kitobxonlik kuzatuvchisi: oʻqigan, oʻqiyotgan va oʻqimoqchi boʻlgan kitoblar, progress, qaydlar, statistika, obunalar, klublar va Telegram bot.
 
-- Sayt: https://mutolaa-tracker.vercel.app
+- Sayt: https://xatchop.uz (eski manzil `mutolaa-tracker.vercel.app` shu yerga yoʻnaltiriladi — `lib/site.ts`)
 - Bot: [@xatchop_uz_bot](https://t.me/xatchop_uz_bot)
 - Texnologiya: Next.js 16 (App Router, `cacheComponents`), Supabase (Postgres + Auth + Storage), Tailwind 4, Vercel
 

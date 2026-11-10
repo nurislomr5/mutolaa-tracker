@@ -20,7 +20,7 @@ jobs:
           set -o pipefail
           curl --fail-with-body -sS -X POST \
             -H "Authorization: Bearer $CRON_SECRET" \
-            "https://mutolaa-tracker.vercel.app/api/cron/reminders" | head -c 2000
+            "https://xatchop.uz/api/cron/reminders" | head -c 2000
         env:
           CRON_SECRET: ${{ secrets.CRON_SECRET }}
       - name: Telegram ogohlantirish

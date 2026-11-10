@@ -1,5 +1,6 @@
 import { createServerClient } from "@supabase/ssr";
 import { NextResponse, type NextRequest } from "next/server";
+import { canonicalRedirect } from "@/lib/site";
 
 // Faqat kirgan foydalanuvchilar uchun sahifalar
 const PROTECTED = ["/klublar/yangi", "/javonim", "/kitob-qoshish", "/skaner", "/lenta", "/qaydlar", "/statistika", "/sozlamalar"];
@@ -7,6 +8,11 @@ const PROTECTED = ["/klublar/yangi", "/javonim", "/kitob-qoshish", "/skaner", "/
 // Har bir soʻrovda Supabase sessiyasini yangilaydi va himoyalangan sahifalarga mehmonni /kirish ga yuboradi.
 // Bu faqat optimistik tekshiruv — haqiqiy ruxsat RLS va server action'lardagi getSessionUser() da.
 export async function proxy(request: NextRequest) {
+  const host = request.headers.get("x-forwarded-host") ?? request.headers.get("host") ?? request.nextUrl.host;
+  const moved = canonicalRedirect(request.method, host, request.nextUrl.pathname, request.nextUrl.search);
+  // eski domendan koʻchirish doimiy (308), kirish kodini uzatish esa bir martalik
+  if (moved) return NextResponse.redirect(new URL(moved, request.url), moved.startsWith("https://") ? 308 : 307);
+
   let response = NextResponse.next({ request });
 
   const supabase = createServerClient(process.env.NEXT_PUBLIC_SUPABASE_URL!, process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!, {
