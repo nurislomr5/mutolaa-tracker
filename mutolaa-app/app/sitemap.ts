@@ -39,6 +39,8 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
     { url: base, changeFrequency: "daily", priority: 1 },
     { url: `${base}/kitoblar`, changeFrequency: "daily", priority: 0.9 },
     { url: `${base}/nashriyotlar`, changeFrequency: "weekly", priority: 0.6 },
+    { url: `${base}/maxfiylik`, changeFrequency: "yearly", priority: 0.2 },
+    { url: `${base}/shartlar`, changeFrequency: "yearly", priority: 0.2 },
     ...books.map((b) => ({
       url: `${base}/kitob/${b.slug}`,
       lastModified: b.updated_at ? new Date(b.updated_at as string) : undefined,

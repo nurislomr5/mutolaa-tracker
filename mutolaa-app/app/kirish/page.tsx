@@ -1,5 +1,6 @@
 import type { Metadata } from "next";
 import { cacheLife } from "next/cache";
+import Link from "next/link";
 import { redirect } from "next/navigation";
 import { Suspense } from "react";
 import { Card } from "@/components/ui/card";
@@ -47,6 +48,17 @@ export default function LoginPage(props: PageProps<"/kirish">) {
         <Suspense fallback={<div className="h-64 animate-pulse rounded-lg bg-surface-2" />}>
           <Login searchParams={props.searchParams} />
         </Suspense>
+        <p className="mt-6 text-center text-xs leading-relaxed text-muted">
+          {uz.auth.consentBefore}
+          <Link href="/shartlar" className="underline hover:text-text">
+            {uz.auth.consentTerms}
+          </Link>
+          {uz.auth.consentAnd}
+          <Link href="/maxfiylik" className="underline hover:text-text">
+            {uz.auth.consentPrivacy}
+          </Link>
+          {uz.auth.consentAfter}
+        </p>
       </Card>
     </Container>
   );

@@ -12,6 +12,7 @@ import { isTelegramEmail } from "@/lib/bot/login";
 import { uz } from "@/lib/i18n/uz";
 import { getProfile, isTelegramLinked } from "@/lib/shelf";
 import { getSessionUser } from "@/lib/supabase/server";
+import { DeleteAccount } from "./delete-account";
 import { ProfileForm } from "./profile-form";
 import { RemindersForm } from "./reminders-form";
 import { TelegramLink } from "./telegram-link";
@@ -65,6 +66,9 @@ async function Settings() {
               {uz.auth.signOut}
             </Button>
           </form>
+          <div className="mt-5 border-t border-border pt-4">
+            <DeleteAccount />
+          </div>
         </Card>
       </div>
     </div>

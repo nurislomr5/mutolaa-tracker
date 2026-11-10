@@ -597,3 +597,76 @@ describe("20261111000013: kitobxonlik klublari", () => {
     expect(await q1(`select current_book_id from public.clubs where id = $1`, [openId])).toEqual([{ current_book_id: main }]);
   });
 });
+
+// app/actions/account.ts: Supabase Auth auth.users dagi yozuvni oʻchiradi — qolgani shu zanjir bilan oʻchishi shart.
+// Yangi jadval foydalanuvchiga "on delete cascade"siz bogʻlansa, hisobni oʻchirish xato beradi — bu test shuni ushlaydi.
+describe("hisobni oʻchirish: auth.users oʻchsa hamma shaxsiy maʼlumot oʻchadi", () => {
+  const q1 = async <T = Record<string, unknown>>(sql: string, params: unknown[] = []) => (await db.query<T>(sql, params)).rows;
+  const D = "00000000-0000-0000-0000-00000000000d";
+  let book: number, reviewA: number, reviewD: number, ownClub: number, otherClub: number;
+
+  beforeAll(async () => {
+    await q1(`insert into auth.users (id, email) values ($1, 'd@x.test')`, [D]);
+    [{ id: book }] = await q1<{ id: number }>(
+      `insert into public.books (slug, title, source, created_by) values ('ketuvchi-kitobi', 'Ketuvchi qoʻshgan kitob', 'user', $1) returning id`,
+      [D],
+    );
+    // javon, progress, qayd, shaxsiy javon, taqriz (lenta yozuvi trigger orqali)
+    [{ id: reviewD }] = await q1<{ id: number }>(
+      `insert into public.user_books (user_id, book_id, status, rating, review) values ($1, $2, 'read', 5, 'Zoʻr kitob') returning id`,
+      [D, book],
+    );
+    await q1(`insert into public.reading_sessions (user_id, user_book_id, delta, new_value) values ($1, $2, 10, 10)`, [D, reviewD]);
+    await q1(`insert into public.notes (user_id, user_book_id, type, content) values ($1, $2, 'iqtibos', 'Esda qolsin')`, [D, reviewD]);
+    const [{ id: shelf }] = await q1<{ id: number }>(`insert into public.shelves (user_id, name) values ($1, 'Sevimlilar') returning id`, [D]);
+    await q1(`insert into public.shelf_books (shelf_id, book_id) values ($1, $2)`, [shelf, book]);
+    // Telegram, xato xabari
+    await q1(`insert into public.telegram_accounts (user_id, telegram_id) values ($1, 900000004)`, [D]);
+    await q1(`insert into public.telegram_link_tokens (user_id) values ($1)`, [D]);
+    await q1(`insert into public.book_reports (user_id, book_id, message) values ($1, $2, 'Muqova xato')`, [D, book]);
+    // obunalar va ovozlar — ikki tomonga
+    await q1(`insert into public.follows (follower_id, following_id) values ($1, $2), ($2, $1)`, [D, A]);
+    [{ id: reviewA }] = await q1<{ id: number }>(
+      `insert into public.user_books (user_id, book_id, status, review) values ($1, $2, 'read', 'Menga ham yoqdi') returning id`,
+      [A, book],
+    );
+    await q1(`insert into public.review_votes (user_id, user_book_id) values ($1, $2), ($3, $4)`, [D, reviewA, A, reviewD]);
+    // oʻzi ochgan klub (ichida boshqa aʼzoning xabari) va boshqaning klubidagi aʼzoligi
+    const slug = (await as("authenticated", D, `select public.create_club('Ketuvchining klubi', null, true) as s`)).rows[0].s;
+    [{ id: ownClub }] = await q1<{ id: number }>(`select id from public.clubs where slug = $1`, [slug]);
+    await q1(`insert into public.club_members (club_id, user_id) values ($1, $2)`, [ownClub, A]);
+    await q1(`insert into public.club_posts (club_id, user_id, body) values ($1, $2, 'Salom, klub!')`, [ownClub, A]);
+    [{ id: otherClub }] = await q1<{ id: number }>(`select id from public.clubs where owner_id = $1 order by id limit 1`, [A]);
+    await q1(`insert into public.club_members (club_id, user_id) values ($1, $2)`, [otherClub, D]);
+    const [{ id: post }] = await q1<{ id: number }>(
+      `insert into public.club_posts (club_id, user_id, body) values ($1, $2, 'Men ketyapman') returning id`,
+      [otherClub, D],
+    );
+    await q1(`insert into public.club_posts (club_id, user_id, parent_id, body) values ($1, $2, $3, 'Xayr')`, [otherClub, A, post]);
+
+    await q1(`delete from auth.users where id = $1`, [D]);
+  });
+
+  it("foydalanuvchiga tegishli hech narsa qolmaydi", async () => {
+    const left = async (table: string, column = "user_id") => (await q1(`select 1 from public.${table} where ${column} = $1`, [D])).length;
+    expect(await left("profiles", "id")).toBe(0);
+    for (const table of ["user_books", "reading_sessions", "notes", "shelves", "activities", "telegram_accounts", "telegram_link_tokens", "book_reports", "review_votes", "club_members", "club_posts"]) {
+      expect(await left(table), table).toBe(0);
+    }
+    expect(await left("follows", "follower_id")).toBe(0);
+    expect(await left("follows", "following_id")).toBe(0);
+    expect(await left("clubs", "owner_id")).toBe(0);
+    // oʻzi ochgan klub butun muhokamasi bilan ketadi; uning taqriziga berilgan ovoz va xabariga yozilgan javob ham
+    expect(await q1(`select 1 from public.club_posts where club_id = $1`, [ownClub])).toEqual([]);
+    expect(await q1(`select 1 from public.club_members where club_id = $1`, [ownClub])).toEqual([]);
+    expect(await q1(`select 1 from public.review_votes where user_book_id = $1`, [reviewD])).toEqual([]);
+    expect(await q1(`select 1 from public.club_posts where club_id = $1 and body = 'Xayr'`, [otherClub])).toEqual([]);
+  });
+
+  it("qoʻshgan kitobi katalogda qoladi, boshqalarning maʼlumotiga tegilmaydi", async () => {
+    expect(await q1(`select created_by, source from public.books where id = $1`, [book])).toEqual([{ created_by: null, source: "user" }]);
+    expect(await q1(`select review from public.user_books where id = $1`, [reviewA])).toEqual([{ review: "Menga ham yoqdi" }]);
+    expect(await q1(`select 1 from public.profiles where id = $1`, [A])).toHaveLength(1);
+    expect(await q1(`select 1 from public.clubs where id = $1`, [otherClub])).toHaveLength(1);
+  });
+});

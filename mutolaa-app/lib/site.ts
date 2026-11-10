@@ -8,6 +8,9 @@ export const site = {
     { name: "Asaxiy", url: "https://asaxiy.uz/product/knigi" },
     { name: "Hilol Nashr", url: "https://hilolnashr.uz" },
   ],
+  // murojaat uchun manzil (maxfiylik va shartlar sahifalarida koʻrsatiladi), masalan:
+  // { label: "@sahifa_admin", url: "https://t.me/sahifa_admin" } yoki { label: "salom@sahifa.uz", url: "mailto:salom@sahifa.uz" }
+  contact: null as { label: string; url: string } | null,
 };
 
 // Saytning toʻliq manzili (SEO: sitemap, canonical, OG; bot havolalari). NEXT_PUBLIC_APP_URL https boʻlmasa — Vercel domeni.
