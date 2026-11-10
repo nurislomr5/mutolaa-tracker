@@ -9,6 +9,7 @@ import { Input } from "@/components/ui/input";
 import { formatDate } from "@/lib/format";
 import { uz } from "@/lib/i18n/uz";
 import { NOTE_TYPES, type Note } from "@/lib/shelf-types";
+import { site, siteHost } from "@/lib/site";
 import { cn } from "@/lib/utils";
 
 const TONE = { iqtibos: "accent", savol: "warning", lugat: "neutral", xulosa: "accent", taymkod: "neutral" } as const;
@@ -80,14 +81,15 @@ async function shareQuoteImage(body: string, bookTitle?: string, refPoint?: stri
   // Brending
   ctx.fillStyle = "rgba(247,244,238,0.5)";
   ctx.font = "500 24px system-ui, sans-serif";
-  ctx.fillText("Sahifa · mutolaa.uz", 780, 965);
+  ctx.textAlign = "right";
+  ctx.fillText(`${site.name} · ${siteHost()}`, 970, 965);
 
   const blob = await new Promise<Blob | null>((resolve) => canvas.toBlob(resolve, "image/png"));
   if (!blob) return;
-  const file = new File([blob], "sahifa-iqtibos.png", { type: "image/png" });
+  const file = new File([blob], `${site.slug}-iqtibos.png`, { type: "image/png" });
   if (typeof navigator !== "undefined" && navigator.canShare?.({ files: [file] })) {
     try {
-      await navigator.share({ files: [file], title: bookTitle ?? "Sahifa iqtibos" });
+      await navigator.share({ files: [file], title: bookTitle ?? `${site.name} iqtibos` });
       return;
     } catch {
       // user cancelled or share failed; fall back to download
@@ -96,7 +98,7 @@ async function shareQuoteImage(body: string, bookTitle?: string, refPoint?: stri
   const url = URL.createObjectURL(blob);
   const a = document.createElement("a");
   a.href = url;
-  a.download = "sahifa-iqtibos.png";
+  a.download = `${site.slug}-iqtibos.png`;
   a.click();
   URL.revokeObjectURL(url);
 }

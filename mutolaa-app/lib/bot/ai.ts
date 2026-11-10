@@ -1,6 +1,7 @@
 import { GoogleGenAI } from "@google/genai";
 import { z } from "zod";
 import { FORMATS, NOTE_TYPES, UNITS } from "@/lib/shelf-types";
+import { site } from "@/lib/site";
 
 // Matn yoki ovozli xabarni Gemini orqali tuzilgan amalga aylantirish
 
@@ -38,7 +39,7 @@ export type BookContext = {
 };
 
 function instruction(books: BookContext[]) {
-  return `Sen "Sahifa" kitob kuzatuvchisining Telegram yordamchisisan. Foydalanuvchi oʻzbek tilida (lotin yoki kirill, ba'zan ruscha) yozadi yoki gapiradi.
+  return `Sen "${site.name}" kitob kuzatuvchisining Telegram yordamchisisan. Foydalanuvchi oʻzbek tilida (lotin yoki kirill, ba'zan ruscha) yozadi yoki gapiradi.
 Uning javonidagi kitoblar (JSON): ${JSON.stringify(books)}
 
 Xabarni tahlil qilib FAQAT shu JSON obyektni qaytar:

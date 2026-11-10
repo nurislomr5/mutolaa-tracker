@@ -4,6 +4,8 @@ import { cacheLife } from "next/cache";
 
 const token = () => (process.env.TELEGRAM_BOT_TOKEN ?? "").trim();
 
+import { site } from "@/lib/site";
+
 export { siteUrl as appUrl } from "@/lib/site";
 
 export function esc(text: string | null | undefined) {
@@ -67,7 +69,7 @@ export function answerInlineQuery(inlineQueryId: string, articles: InlineArticle
         message_text: a.message_text,
         parse_mode: "HTML",
       },
-      ...(a.url ? { reply_markup: { inline_keyboard: [[{ text: a.button_text ?? "Sahifa'da ochish ↗", url: a.url }]] } } : {}),
+      ...(a.url ? { reply_markup: { inline_keyboard: [[{ text: a.button_text ?? `${site.name}'da ochish ↗`, url: a.url }]] } } : {}),
     })),
   });
 }

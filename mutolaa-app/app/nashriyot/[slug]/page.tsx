@@ -9,6 +9,7 @@ import { Container } from "@/components/ui/container";
 import { getCatalog, getPublisher, getPublishers, PAGE_SIZE } from "@/lib/catalog";
 import { formatCount } from "@/lib/format";
 import { uz } from "@/lib/i18n/uz";
+import { site } from "@/lib/site";
 
 export async function generateStaticParams() {
   const publishers = await getPublishers();
@@ -20,7 +21,7 @@ export async function generateMetadata({ params }: PageProps<"/nashriyot/[slug]"
   if (!publisher) return { title: uz.notFound.title };
   return {
     title: `${publisher.name} kitoblari`,
-    description: `${publisher.name} nashriyotining kitoblari: narxlar, betlar soni va yangi nashrlar — Sahifa katalogida.`,
+    description: `${publisher.name} nashriyotining kitoblari: narxlar, betlar soni va yangi nashrlar — ${site.name} katalogida.`,
     alternates: { canonical: `/nashriyot/${publisher.slug}` },
   };
 }

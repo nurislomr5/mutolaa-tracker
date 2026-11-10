@@ -7,6 +7,7 @@ import { FollowEntity } from "@/components/social/follow-entity";
 import { Container } from "@/components/ui/container";
 import { getAuthor, getPopularAuthorSlugs } from "@/lib/catalog";
 import { uz } from "@/lib/i18n/uz";
+import { site } from "@/lib/site";
 
 export async function generateStaticParams() {
   const slugs = await getPopularAuthorSlugs(30);
@@ -20,7 +21,7 @@ export async function generateMetadata({ params }: PageProps<"/muallif/[slug]">)
   const titles = author.books.slice(0, 3).map((b) => `«${b.title}»`).join(", ");
   return {
     title: author.name,
-    description: `${author.name} — ${author.books.length} ta kitob${titles ? `: ${titles}` : ""}. Oʻqing, tinglang va Sahifa'da kuzating.`,
+    description: `${author.name} — ${author.books.length} ta kitob${titles ? `: ${titles}` : ""}. Oʻqing, tinglang va ${site.name}'da kuzating.`,
     alternates: { canonical: `/muallif/${author.slug}` },
   };
 }

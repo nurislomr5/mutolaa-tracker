@@ -3,6 +3,7 @@
 import { Button } from "@/components/ui/button";
 import { uz } from "@/lib/i18n/uz";
 import type { NoteWithBook, ShelfItem } from "@/lib/shelf";
+import { site } from "@/lib/site";
 
 function downloadTextFile(filename: string, content: string, mime: string) {
   const blob = new Blob(["\uFEFF" + content], { type: `${mime};charset=utf-8` });
@@ -26,7 +27,7 @@ export function ExportNotesButton({ notes }: { notes: NoteWithBook[] }) {
       byBook.set(title, list);
     }
 
-    const lines: string[] = [`# Sahifa — ${uz.notes.title}`, ""];
+    const lines: string[] = [`# ${site.name} — ${uz.notes.title}`, ""];
     for (const [bookTitle, items] of byBook) {
       lines.push(`## ${bookTitle}`, "");
       for (const n of items) {
@@ -42,7 +43,7 @@ export function ExportNotesButton({ notes }: { notes: NoteWithBook[] }) {
       }
     }
 
-    downloadTextFile("sahifa-qaydlar.md", lines.join("\n"), "text/markdown");
+    downloadTextFile(`${site.slug}-qaydlar.md`, lines.join("\n"), "text/markdown");
   }
 
   return (
@@ -78,7 +79,7 @@ export function ExportShelfCsvButton({ items }: { items: ShelfItem[] }) {
       csvCell(i.review ? (i.review_is_spoiler ? "ha" : "yoʻq") : ""),
     ]);
     const csv = [header.join(","), ...rows.map((r) => r.join(","))].join("\r\n");
-    downloadTextFile("sahifa-javonim.csv", csv, "text/csv");
+    downloadTextFile(`${site.slug}-javonim.csv`, csv, "text/csv");
   }
 
   return (

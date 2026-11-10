@@ -1,5 +1,5 @@
 /**
- * PWA va favicon ikonkalari — saytdagi logodagi ochiq kitob belgisidan (components/site-header.tsx).
+ * PWA va favicon ikonkalari — saytdagi logodagi xatchoʻp belgisidan (components/site-header.tsx).
  *
  *   npm run icons   # public/icons/*.png, app/apple-icon.png, app/icon.svg, app/favicon.ico
  */
@@ -8,13 +8,12 @@ import sharp from "sharp";
 
 const ACCENT = "#1f6f5c";
 
-// scale — kitob oʻlchami; maskable ikonkada Android doira/kvadrat qilib kesadi, shuning uchun kichikroq va burchaksiz
+// scale — belgi oʻlchami; maskable ikonkada Android doira/kvadrat qilib kesadi, shuning uchun kichikroq va burchaksiz
 function svg({ scale, radius }: { scale: number; radius: number }) {
   return `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512">
   <rect width="512" height="512" rx="${radius}" fill="${ACCENT}"/>
-  <g transform="translate(256 256) scale(${scale}) translate(-16 -16.5)">
-    <path d="M4 7c4-1.6 8-1.6 12 1v18c-4-2.6-8-2.6-12-1V7Z" fill="#fff" opacity=".55"/>
-    <path d="M28 7c-4-1.6-8-1.6-12 1v18c4-2.6 8-2.6 12-1V7Z" fill="#fff"/>
+  <g transform="translate(256 256) scale(${scale}) translate(-16 -16)">
+    <path d="M10 4h12a2 2 0 0 1 2 2v21.1a.9.9 0 0 1-1.42.73L16 23.2l-6.58 4.63A.9.9 0 0 1 8 27.1V6a2 2 0 0 1 2-2Z" fill="#fff"/>
   </g>
 </svg>`;
 }

@@ -1,3 +1,5 @@
+import { site } from "@/lib/site";
+
 // Interfeys matnlari (oʻzbek lotin). Kirill varianti keyinroq shu tuzilmada qoʻshiladi.
 export const uz = {
   nav: {
@@ -80,7 +82,7 @@ export const uz = {
   },
   footer: {
     catalogSource: "Kitoblar maʼlumoti manbalari:",
-    disclaimer: "Sahifa kitob sotmaydi va matn yoki audioni saqlamaydi — havolalar manbalarga olib boradi.",
+    disclaimer: `${site.name} kitob sotmaydi va matn yoki audioni saqlamaydi — havolalar manbalarga olib boradi.`,
     privacy: "Maxfiylik siyosati",
     terms: "Foydalanish shartlari",
   },
@@ -445,7 +447,7 @@ export const uz = {
   },
   bot: {
     help: [
-      "<b>Sahifa bot</b> — kitob kuzatuvchingiz.",
+      `<b>${site.name} bot</b> — kitob kuzatuvchingiz.`,
       "",
       "Shunchaki yozing yoki ovozli xabar yuboring:",
       "• «Oʻtkan kunlar 150-betga keldim»",
@@ -464,13 +466,13 @@ export const uz = {
       "/statistika — yillik natija va streak",
       "/eslatma 21 — har kuni soat 21:00 da eslatma",
     ].join("\n"),
-    linked: "🎉 Telegram hisobingiz Sahifa'ga bogʻlandi!",
+    linked: `🎉 Telegram hisobingiz ${site.name}'ga bogʻlandi!`,
     linkExpired: "⚠️ Bogʻlash havolasi eskirgan yoki notoʻgʻri. Saytdagi Sozlamalar sahifasidan yangisini oling.",
     notLinked: "👋 Assalomu alaykum! Saytga kirish uchun /login buyrugʻini yuboring — hisobingiz avtomatik ochiladi.",
     notLinkedShort: "Avval hisobni bogʻlang",
     loginLink: "🔐 Saytga kirish uchun tugmani bosing. Havola bir marta ishlaydi — uni hech kimga bermang.",
     loginButton: "Saytga kirish",
-    openSite: "📚 Sahifa",
+    openSite: `📚 ${site.name}`,
     openSettings: "⚙️ Sozlamalar",
     openCatalog: "📚 Katalog",
     openNotes: "📝 Qaydlar",
@@ -592,7 +594,7 @@ export const uz = {
       rated: "baho qoʻydi",
       reviewed: "taqriz yozdi",
     },
-    readersTitle: "Sahifa kitobxonlari fikri",
+    readersTitle: `${site.name} kitobxonlari fikri`,
     helpful: "Foydali",
     helpfulVoted: "Foydali deb belgilangan — bekor qilish",
     helpfulOwn: "Oʻz taqrizingiz",
@@ -619,13 +621,13 @@ export const uz = {
   },
   pwa: {
     title: "Ilova",
-    intro: "Sahifa'ni telefoningizga ilova kabi oʻrnating: bosh ekranda ikonka, brauzer panellarisiz toʻliq ekran.",
+    intro: `${site.name}'ni telefoningizga ilova kabi oʻrnating: bosh ekranda ikonka, brauzer panellarisiz toʻliq ekran.`,
     install: "Ilovani oʻrnatish",
     installed: "✅ Ilova oʻrnatilgan — siz hozir uning ichidasiz.",
     telegram: "Telegram ichida ochilgansiz. Oʻrnatish uchun saytni brauzerda (Chrome yoki Safari) oching.",
     ios: "Safari'da pastdagi «Ulashish» tugmasini bosing va «Bosh ekranga qoʻshish» (Add to Home Screen) ni tanlang.",
     other: "Brauzer menyusidan (⋮) «Ilovani oʻrnatish» yoki «Bosh ekranga qoʻshish» ni tanlang.",
-    bannerTitle: "Sahifa'ni telefonga oʻrnating",
+    bannerTitle: `${site.name}'ni telefonga oʻrnating`,
     bannerBody: "Bosh ekrandan bir bosishda oching — ilova kabi, brauzersiz.",
     dismiss: "Yopish",
     offlineTitle: "Internet aloqasi yoʻq",

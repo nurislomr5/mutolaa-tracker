@@ -1,6 +1,6 @@
 import type { BookDetail } from "@/lib/catalog";
 import { formatDuration } from "@/lib/format";
-import { siteUrl } from "@/lib/site";
+import { site, siteUrl } from "@/lib/site";
 
 // Qidiruv tizimlari uchun kitob tavsifi va Book JSON-LD
 
@@ -22,7 +22,7 @@ export function bookDescription(book: BookDetail) {
   });
   const head = `«${book.title}»${book.author_names ? ` — ${book.author_names}` : ""}.`;
   const kinds = formats.length ? ` ${formats.join(", ").replace(/^./, (c) => c.toUpperCase())}.` : "";
-  const tail = book.description ? ` ${book.description.replace(/\s+/g, " ")}` : " Oʻqing, tinglang va progressni Sahifa'da kuzating.";
+  const tail = book.description ? ` ${book.description.replace(/\s+/g, " ")}` : ` Oʻqing, tinglang va progressni ${site.name}'da kuzating.`;
   return cut(`${head}${kinds}${tail}`, 160);
 }
 

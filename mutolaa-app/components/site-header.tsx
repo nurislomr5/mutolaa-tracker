@@ -24,8 +24,7 @@ export function Logo() {
   return (
     <Link href="/" className="flex items-center gap-2 font-serif text-lg font-semibold">
       <svg className="h-7 w-7 text-accent" viewBox="0 0 32 32" fill="none" aria-hidden>
-        <path d="M4 7c4-1.6 8-1.6 12 1v18c-4-2.6-8-2.6-12-1V7Z" fill="currentColor" opacity=".35" />
-        <path d="M28 7c-4-1.6-8-1.6-12 1v18c4-2.6 8-2.6 12-1V7Z" fill="currentColor" />
+        <path d="M10 4h12a2 2 0 0 1 2 2v21.1a.9.9 0 0 1-1.42.73L16 23.2l-6.58 4.63A.9.9 0 0 1 8 27.1V6a2 2 0 0 1 2-2Z" fill="currentColor" />
       </svg>
       {site.name}
     </Link>

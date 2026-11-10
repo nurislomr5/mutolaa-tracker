@@ -18,7 +18,7 @@ export function createAdmin(): SupabaseClient {
   return createClient(url, key, { auth: { persistSession: false } });
 }
 
-export const USER_AGENT = "SahifaCatalogBot/1.0 (Uzbek book tracker; metadata only)";
+export const USER_AGENT = "XatchopCatalogBot/1.0 (Uzbek book tracker; metadata only)";
 
 export const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms));
 

@@ -17,7 +17,7 @@ import { checkHealth, loadEnv } from "./lib/common";
 loadEnv();
 
 const BASE = "https://mutolaa.com";
-const USER_AGENT = "SahifaCatalogBot/1.0 (Uzbek book tracker; metadata only)";
+const USER_AGENT = "XatchopCatalogBot/1.0 (Uzbek book tracker; metadata only)";
 const CONCURRENCY = 2;
 const DELAY_MS = 1000;
 const FLUSH_EVERY = 50;

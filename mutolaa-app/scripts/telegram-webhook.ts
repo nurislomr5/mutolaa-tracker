@@ -63,9 +63,9 @@ async function main() {
   });
   console.log("setMyCommands:", commands.ok ? "✓" : commands.description);
 
-  // Yozish maydoni yonidagi "📚 Sahifa" tugmasi — saytni Mini App sifatida ochadi (avtomatik kirish bilan)
+  // Yozish maydoni yonidagi "📚 Xatchoʻp" tugmasi — saytni Mini App sifatida ochadi (avtomatik kirish bilan)
   const menu = await call("setChatMenuButton", {
-    menu_button: { type: "web_app", text: "📚 Sahifa", web_app: { url: `${appUrl}/javonim` } },
+    menu_button: { type: "web_app", text: "📚 Xatchoʻp", web_app: { url: `${appUrl}/javonim` } },
   });
   console.log("setChatMenuButton:", menu.ok ? "✓" : menu.description);
 }

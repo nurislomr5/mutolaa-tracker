@@ -1,4 +1,4 @@
-# Sahifa
+# Xatchoʻp
 
 Oʻzbek tilidagi kitobxonlik kuzatuvchisi: oʻqigan, oʻqiyotgan va oʻqimoqchi boʻlgan kitoblar, progress, qaydlar, statistika, obunalar, klublar va Telegram bot.
 

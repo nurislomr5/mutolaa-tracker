@@ -3,6 +3,7 @@
 import { Button } from "@/components/ui/button";
 import { formatCount, formatDuration } from "@/lib/format";
 import { uz } from "@/lib/i18n/uz";
+import { site, siteHost } from "@/lib/site";
 
 export function ShareStatsButton({
   year,
@@ -42,7 +43,7 @@ export function ShareStatsButton({
 
     ctx.fillStyle = "#d4af37";
     ctx.font = "600 34px system-ui, sans-serif";
-    ctx.fillText(`SAHIFA · ${year}-YIL SARHISOBI`, 110, 150);
+    ctx.fillText(`${site.name.toUpperCase()} · ${year}-YIL SARHISOBI`, 110, 150);
 
     ctx.fillStyle = "#f7f4ee";
     ctx.font = "bold 150px Georgia, serif";
@@ -82,14 +83,15 @@ export function ShareStatsButton({
 
     ctx.fillStyle = "rgba(247,244,238,0.5)";
     ctx.font = "500 24px system-ui, sans-serif";
-    ctx.fillText("Sahifa · mutolaa.uz", 780, 965);
+    ctx.textAlign = "right";
+    ctx.fillText(`${site.name} · ${siteHost()}`, 970, 965);
 
     const blob = await new Promise<Blob | null>((resolve) => canvas.toBlob(resolve, "image/png"));
     if (!blob) return;
-    const file = new File([blob], `sahifa-${year}.png`, { type: "image/png" });
+    const file = new File([blob], `${site.slug}-${year}.png`, { type: "image/png" });
     if (typeof navigator !== "undefined" && navigator.canShare?.({ files: [file] })) {
       try {
-        await navigator.share({ files: [file], title: `Sahifa ${year}` });
+        await navigator.share({ files: [file], title: `${site.name} ${year}` });
         return;
       } catch {
         // fallback to download
@@ -98,7 +100,7 @@ export function ShareStatsButton({
     const url = URL.createObjectURL(blob);
     const a = document.createElement("a");
     a.href = url;
-    a.download = `sahifa-${year}.png`;
+    a.download = `${site.slug}-${year}.png`;
     a.click();
     URL.revokeObjectURL(url);
   }

@@ -1,6 +1,8 @@
 // Sayt nomi va asosiy sozlamalar shu yerda — nomni o'zgartirish uchun faqat shu faylni tahrirlang
 export const site = {
-  name: "Sahifa",
+  name: "Xatchoʻp",
+  // lotincha, apostrofsiz shakli — fayl nomlari uchun
+  slug: "xatchop",
   description: "Oʻqigan, oʻqiyotgan va oʻqimoqchi boʻlgan kitoblaringizni oʻzbek tilida kuzating.",
   // katalog maʼlumoti manbalari (futerda koʻrsatiladi)
   sources: [
@@ -19,4 +21,9 @@ export const site = {
 export function siteUrl() {
   const raw = (process.env.NEXT_PUBLIC_APP_URL ?? "").trim().replace(/\/$/, "");
   return raw.startsWith("https://") ? raw : "https://mutolaa-tracker.vercel.app";
+}
+
+// Sayt manzilining qisqa koʻrinishi (ulashiladigan rasmlar ostida)
+export function siteHost() {
+  return new URL(siteUrl()).host;
 }
