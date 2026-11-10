@@ -265,10 +265,11 @@ export const uz = {
   },
   editBook: {
     title: "Kitobni tahrirlash",
-    subtitle: "Siz qoʻshgan kitob maʼlumotlarini yangilang. Oʻzgarishlar barcha kitobxonlarga koʻrinadi.",
+    subtitle: "Kitob maʼlumotlarini yangilang. Oʻzgarishlar barcha kitobxonlarga koʻrinadi.",
+    adminNote: "Siz bu kitobni admin sifatida tahrirlayapsiz. Tuzatilgan nom, muallif, tavsif, muqova va nashriyotni haftalik yangilanish qayta yozmaydi.",
     submit: "Saqlash",
     link: "Tahrirlash",
-    forbidden: "Bu kitobni faqat uni qoʻshgan foydalanuvchi tahrirlay oladi.",
+    forbidden: "Bu kitobni faqat uni qoʻshgan foydalanuvchi yoki admin tahrirlay oladi.",
   },
   publishers: {
     title: "Nashriyotlar",

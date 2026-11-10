@@ -18,6 +18,12 @@ export function createAdmin(): SupabaseClient {
   return createClient(url, key, { auth: { persistSession: false } });
 }
 
+// books.edited_at ustuni (migratsiya 018) bormi? Yoʻq boʻlsa import eski tartibda ishlaydi.
+export async function hasEditedAt(db: SupabaseClient): Promise<boolean> {
+  const { error } = await db.from("books").select("edited_at").limit(1);
+  return !error;
+}
+
 export const USER_AGENT = "XatchopCatalogBot/1.0 (Uzbek book tracker; metadata only)";
 
 export const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms));

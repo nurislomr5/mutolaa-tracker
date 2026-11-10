@@ -12,7 +12,7 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
 import { PUBLISHER_NAMES, publisherSlug } from "../lib/publishers";
 import { slugify, uzNormalize } from "../lib/text/normalize";
-import { checkHealth, cliArgs, createAdmin, decodeHtml, fetchText, jsonLdNodes, loadEnv, runPool } from "./lib/common";
+import { checkHealth, cliArgs, createAdmin, decodeHtml, fetchText, hasEditedAt, jsonLdNodes, loadEnv, runPool } from "./lib/common";
 
 loadEnv();
 
@@ -200,10 +200,12 @@ class Saver {
   private publishers = new Map<string, number>();
   private usedSlugs = new Set<string>();
   stats = { matched: 0, created: 0 };
+  private protectEdited = false;
 
   constructor(private db: SupabaseClient) {}
 
   async init() {
+    this.protectEdited = await hasEditedAt(this.db);
     const { data } = await this.db.from("publishers").select("id, slug");
     for (const p of data ?? []) this.publishers.set(p.slug, p.id);
   }
@@ -285,13 +287,16 @@ class Saver {
       // Mavjud asarni qogʻoz nashr maʼlumoti bilan boyitamiz (boʻsh maydonlarnigina toʻldiramiz)
       const { data: book } = await this.db
         .from("books")
-        .select("formats, isbn, page_count, publisher_id, published_year, script, translator, cover_url, description")
+        .select(`formats, isbn, page_count, publisher_id, published_year, script, translator, cover_url, description${this.protectEdited ? ", edited_at" : ""}`)
         .eq("id", bookId)
-        .single();
+        .single<Record<string, unknown> & { formats: string[] }>();
       const patch: Record<string, unknown> = {};
       if (book && !book.formats.includes("paper")) patch.formats = [...book.formats, "paper"];
-      const fill = { isbn: p.isbn, page_count: p.page_count, publisher_id: publisherId, published_year: p.published_year, script: p.script, translator: p.translator, cover_url: p.cover_url, description: p.description };
-      for (const [k, v] of Object.entries(fill)) if (v != null && book && book[k as keyof typeof book] == null) patch[k] = v;
+      // Saytda qoʻlda tahrirlangan kitobda boʻsh qoldirilgan maydon — ataylab boʻsh: faqat formada yoʻq maydonlarni toʻldiramiz
+      const fill: Record<string, unknown> = book?.edited_at
+        ? { script: p.script, translator: p.translator }
+        : { isbn: p.isbn, page_count: p.page_count, publisher_id: publisherId, published_year: p.published_year, script: p.script, translator: p.translator, cover_url: p.cover_url, description: p.description };
+      for (const [k, v] of Object.entries(fill)) if (v != null && book && book[k] == null) patch[k] = v;
       if (Object.keys(patch).length) await this.db.from("books").update(patch).eq("id", bookId);
       this.stats.matched++;
     } else {

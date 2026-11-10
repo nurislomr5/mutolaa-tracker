@@ -8,6 +8,8 @@ import { ReviewForm } from "@/components/shelf/review-form";
 import { StatusPicker } from "@/components/shelf/status-picker";
 import { buttonClasses } from "@/components/ui/button";
 import { Card, CardTitle } from "@/components/ui/card";
+import { getAdminUser } from "@/lib/admin";
+import { canEditBook } from "@/lib/book-edit";
 import type { BookDetail } from "@/lib/catalog";
 import { formatDate } from "@/lib/format";
 import { uz } from "@/lib/i18n/uz";
@@ -28,11 +30,11 @@ export async function ShelfActions({ book }: { book: BookDetail }) {
   return <StatusPicker bookId={book.id} userBookId={userBook?.id} status={userBook?.status} />;
 }
 
-// Foydalanuvchi qoʻshgan kitob — faqat uni qoʻshgan odamga "Tahrirlash" havolasi
+// "Tahrirlash" havolasi: kitobni qoʻshgan odamga va adminga (admin — har qanday kitobda)
 export async function EditBookLink({ book }: { book: BookDetail }) {
-  if (book.source !== "user" || !book.created_by) return null;
   const user = await getSessionUser();
-  if (user?.id !== book.created_by) return null;
+  if (!user) return null;
+  if (!canEditBook(book, user.id, false) && !(await getAdminUser())) return null;
   return (
     <Link href={`/kitob/${book.slug}/tahrirlash`} className="text-sm text-accent hover:underline">
       ✎ {uz.editBook.link}
