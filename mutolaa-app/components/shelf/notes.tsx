@@ -3,112 +3,35 @@
 import Link from "next/link";
 import { useActionState, useRef, useState, useTransition } from "react";
 import { addNote, deleteNote, saveNoteAnswer, setNoteResolved } from "@/app/actions/shelf";
+import { ShareImageButton } from "@/components/share/share-dialog";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { formatDate } from "@/lib/format";
 import { uz } from "@/lib/i18n/uz";
+import type { ShareCard } from "@/lib/share-image";
 import { NOTE_TYPES, type Note } from "@/lib/shelf-types";
-import { site, siteHost } from "@/lib/site";
+import { site } from "@/lib/site";
 import { cn } from "@/lib/utils";
 
 const TONE = { iqtibos: "accent", savol: "warning", lugat: "neutral", xulosa: "accent", taymkod: "neutral" } as const;
 
-function wrapCanvasText(ctx: CanvasRenderingContext2D, text: string, maxWidth: number, maxLines: number): string[] {
-  const words = text.replace(/\s+/g, " ").trim().split(" ");
-  const lines: string[] = [];
-  let line = "";
-  for (const w of words) {
-    const test = line ? `${line} ${w}` : w;
-    if (ctx.measureText(test).width > maxWidth && line) {
-      lines.push(line);
-      line = w;
-      if (lines.length >= maxLines - 1) break;
-    } else {
-      line = test;
-    }
-  }
-  if (line && lines.length < maxLines) lines.push(line);
-  return lines;
-}
+type NoteBook = { slug: string; title: string; author_names?: string | null; cover_url?: string | null };
 
-async function shareQuoteImage(body: string, bookTitle?: string, refPoint?: string | null) {
-  const canvas = document.createElement("canvas");
-  canvas.width = 1080;
-  canvas.height = 1080;
-  const ctx = canvas.getContext("2d");
-  if (!ctx) return;
-
-  // Fon
-  const grad = ctx.createLinearGradient(0, 0, 1080, 1080);
-  grad.addColorStop(0, "#14261c");
-  grad.addColorStop(1, "#1f3d2d");
-  ctx.fillStyle = grad;
-  ctx.fillRect(0, 0, 1080, 1080);
-
-  // Ichki ramka
-  ctx.strokeStyle = "rgba(255,255,255,0.14)";
-  ctx.lineWidth = 3;
-  ctx.strokeRect(64, 64, 952, 952);
-
-  // Qoʻshtirnoq belgisi
-  ctx.fillStyle = "rgba(212, 175, 55, 0.35)";
-  ctx.font = "bold 160px Georgia, serif";
-  ctx.fillText("“", 110, 230);
-
-  // Iqtibos matni
-  ctx.fillStyle = "#f7f4ee";
-  ctx.font = "italic 40px Georgia, serif";
-  const lines = wrapCanvasText(ctx, body, 820, 10);
-  let y = 310;
-  for (const ln of lines) {
-    ctx.fillText(ln, 130, y);
-    y += 58;
-  }
-
-  // Kitob nomi va joyi
-  if (bookTitle) {
-    ctx.fillStyle = "#d4af37";
-    ctx.font = "600 32px system-ui, sans-serif";
-    ctx.fillText(`— ${bookTitle.slice(0, 48)}`, 130, 890);
-  }
-  if (refPoint) {
-    ctx.fillStyle = "rgba(247,244,238,0.68)";
-    ctx.font = "400 26px system-ui, sans-serif";
-    ctx.fillText(refPoint.slice(0, 50), 130, 935);
-  }
-
-  // Brending
-  ctx.fillStyle = "rgba(247,244,238,0.5)";
-  ctx.font = "500 24px system-ui, sans-serif";
-  ctx.textAlign = "right";
-  ctx.fillText(`${site.name} · ${siteHost()}`, 970, 965);
-
-  const blob = await new Promise<Blob | null>((resolve) => canvas.toBlob(resolve, "image/png"));
-  if (!blob) return;
-  const file = new File([blob], `${site.slug}-iqtibos.png`, { type: "image/png" });
-  if (typeof navigator !== "undefined" && navigator.canShare?.({ files: [file] })) {
-    try {
-      await navigator.share({ files: [file], title: bookTitle ?? `${site.name} iqtibos` });
-      return;
-    } catch {
-      // user cancelled or share failed; fall back to download
-    }
-  }
-  const url = URL.createObjectURL(blob);
-  const a = document.createElement("a");
-  a.href = url;
-  a.download = `${site.slug}-iqtibos.png`;
-  a.click();
-  URL.revokeObjectURL(url);
-}
-
-export function NoteItem({ note, book }: { note: Note; book?: { slug: string; title: string } }) {
+export function NoteItem({ note, book }: { note: Note; book?: NoteBook }) {
   const [pending, start] = useTransition();
   const t = uz.notes;
   const { content: body, answer } = note;
   const [editingAnswer, setEditingAnswer] = useState(false);
   const [answerText, setAnswerText] = useState(answer ?? "");
+  // iqtibos — qoʻshtirnoq bilan, boshqa qaydlar — turi yozilgan sarlavha bilan chiziladi
+  const shareCard: ShareCard = {
+    kind: "quote",
+    text: body,
+    label: note.type === "iqtibos" ? null : uz.noteType[note.type],
+    book: book && { title: book.title, author: book.author_names, cover: book.cover_url },
+    reference: note.reference_point,
+  };
 
   return (
     <li className={cn("rounded-xl border border-border bg-surface p-4", pending && "opacity-60", note.is_resolved && "opacity-80")}>
@@ -178,13 +101,14 @@ export function NoteItem({ note, book }: { note: Note; book?: { slug: string; ti
             </button>
           </>
         )}
-        <button
-          type="button"
-          onClick={() => void shareQuoteImage(body, book?.title, note.reference_point)}
+        <ShareImageButton
+          card={shareCard}
+          fileName={`${site.slug}-${note.type}.png`}
+          shareTitle={book ? uz.share.quoteTitle(book.title) : uz.noteType[note.type]}
           className="text-muted hover:text-accent"
         >
-          📤 {t.shareQuote}
-        </button>
+          {uz.share.button}
+        </ShareImageButton>
         <button
           type="button"
           disabled={pending}

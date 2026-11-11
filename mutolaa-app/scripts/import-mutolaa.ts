@@ -11,8 +11,9 @@
  * Kerakli env: NEXT_PUBLIC_SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY (dry-run uchun shart emas)
  */
 import { createClient, type SupabaseClient } from "@supabase/supabase-js";
+import { EDIT_PROTECTED_FIELDS, keepEdited } from "../lib/book-edit";
 import { slugify } from "../lib/text/normalize";
-import { checkHealth, loadEnv } from "./lib/common";
+import { checkHealth, hasEditedAt, loadEnv } from "./lib/common";
 
 loadEnv();
 
@@ -373,6 +374,7 @@ async function flush(
   db: SupabaseClient,
   caches: Record<Taxonomy, TaxonomyCache>,
   batch: ParsedBook[],
+  protectEdited: boolean,
 ) {
   if (!batch.length) return;
   await caches.authors.resolve(batch.flatMap((b) => b.authors));
@@ -380,14 +382,22 @@ async function flush(
   await caches.topics.resolve(batch.flatMap((b) => b.topics));
 
   // Boshqa manbalar (Asaxiy) qoʻshgan formatlarni ("paper") oʻchirib yubormaslik uchun mavjudlari bilan birlashtiramiz
-  const { data: existing } = await db.from("books").select("slug, formats").in("slug", batch.map((b) => b.book.slug));
-  const oldFormats = new Map((existing ?? []).map((r) => [r.slug as string, r.formats as string[]]));
-  const rows = batch.map((b) => ({ ...b.book, formats: [...new Set([...b.book.formats, ...(oldFormats.get(b.book.slug) ?? [])])] }));
+  // Saytda qoʻlda tahrirlangan kitoblarning (edited_at) tuzatilgan maydonlari ham saqlanadi
+  const columns = protectEdited ? `slug, formats, edited_at, ${EDIT_PROTECTED_FIELDS.join(", ")}` : "slug, formats";
+  const { data: existing, error: readError } = await db.from("books").select(columns).in("slug", batch.map((b) => b.book.slug));
+  if (readError) throw new Error(`books read: ${readError.message}`);
+  const old = new Map(((existing ?? []) as unknown as Record<string, unknown>[]).map((r) => [r.slug as string, r]));
+  const rows = batch.map((b) => ({
+    ...keepEdited(b.book, old.get(b.book.slug)),
+    formats: [...new Set([...b.book.formats, ...((old.get(b.book.slug)?.formats as string[] | undefined) ?? [])])],
+  }));
+  const editedSlugs = new Set([...old.values()].filter((r) => r.edited_at).map((r) => r.slug as string));
 
   const { data: saved, error } = await db.from("books").upsert(rows, { onConflict: "slug" }).select("id, slug");
   if (error) throw new Error(`books upsert: ${error.message}`);
   const idBySlug = new Map((saved ?? []).map((r) => [r.slug as string, r.id as number]));
   const bookIds = [...idBySlug.values()];
+  const keptAuthorIds = new Set([...editedSlugs].map((s) => idBySlug.get(s)).filter((id): id is number => id != null));
 
   // Manba yozuvi (koʻp manbali katalog: books — asar, book_sources — qayerda bor)
   const sources = await db.from("book_sources").upsert(
@@ -416,9 +426,14 @@ async function flush(
     ["book_genres", batch.flatMap((b) => b.genres.map((g) => ({ book_id: idBySlug.get(b.book.slug), genre_id: caches.genres.idFor(g) })))],
     ["book_topics", batch.flatMap((b) => b.topics.map((t) => ({ book_id: idBySlug.get(b.book.slug), topic_id: caches.topics.idFor(t) })))],
   ] as const) {
-    const del = await db.from(table).delete().in("book_id", bookIds);
+    // Tahrirlangan kitobning mualliflari saytda belgilangan holicha qoladi (rukn va mavzular yangilanaveradi)
+    const ids = table === "book_authors" ? bookIds.filter((id) => !keptAuthorIds.has(id)) : bookIds;
+    if (!ids.length) continue;
+    const del = await db.from(table).delete().in("book_id", ids);
     if (del.error) throw new Error(`${table} delete: ${del.error.message}`);
-    const valid = (rows as Record<string, unknown>[]).filter((r) => Object.values(r).every((v) => v != null));
+    const valid = (rows as Record<string, unknown>[]).filter(
+      (r) => Object.values(r).every((v) => v != null) && ids.includes(r.book_id as number),
+    );
     // bitta kitobda bir muallif ikki marta kelsa — birlamchi kalit buzilmasin
     const dedup = [...new Map(valid.map((r) => [JSON.stringify([r.book_id, r.author_id ?? r.genre_id ?? r.topic_id]), r])).values()];
     if (dedup.length) {
@@ -482,6 +497,7 @@ async function main() {
   if (caches) await Promise.all(Object.values(caches).map((c) => c.load()));
 
   let pending: ParsedBook[] = [];
+  const protectEdited = db ? await hasEditedAt(db) : false;
   let ok = 0;
   let failed = 0;
   let queue = 0;
@@ -513,7 +529,7 @@ async function main() {
         if (pending.length >= FLUSH_EVERY) {
           const batch = pending;
           pending = [];
-          await flush(db!, caches!, batch);
+          await flush(db!, caches!, batch, protectEdited);
           const done = ok + failed;
           const rate = done / ((Date.now() - startedAt) / 1000);
           console.log(`  ✓ ${done}/${slugs.length} (${Math.round((slugs.length - done) / rate / 60)} daq qoldi)`);
@@ -524,7 +540,7 @@ async function main() {
   }
 
   await Promise.all(Array.from({ length: CONCURRENCY }, worker));
-  if (db) await flush(db, caches!, pending);
+  if (db) await flush(db, caches!, pending, protectEdited);
 
   console.log(`Tayyor: ${ok} ta ${DRY_RUN ? "oʻqildi" : "saqlandi"}, ${failed} ta xato, ${Math.round((Date.now() - startedAt) / 1000)} s`);
   checkHealth("Mutolaa", { listed, attempted: slugs.length, ok, failed });

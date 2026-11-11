@@ -18,6 +18,7 @@ export default function robots(): MetadataRoute.Robots {
         "/hafta",
         "/bildirishnomalar",
         "/tanishuv",
+        "/sarhisob",
         "/sozlamalar",
         "/lenta",
         "/skaner",

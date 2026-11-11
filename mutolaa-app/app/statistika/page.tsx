@@ -2,19 +2,23 @@ import type { Metadata } from "next";
 import Link from "next/link";
 import { Suspense } from "react";
 import { BookGrid } from "@/components/book/book-card";
+import { ShareImageButton } from "@/components/share/share-dialog";
 import { ActivityHeatmap } from "@/components/stats/activity-heatmap";
 import { BarList } from "@/components/stats/bar-list";
 import { MonthBars } from "@/components/stats/month-bars";
-import { ShareStatsButton } from "@/components/stats/share-wrapped";
 import { Badge } from "@/components/ui/badge";
+import { buttonClasses } from "@/components/ui/button";
 import { Card, CardTitle } from "@/components/ui/card";
 import { Container } from "@/components/ui/container";
 import { Progress } from "@/components/ui/progress";
 import { formatCount, formatDuration } from "@/lib/format";
 import { uz } from "@/lib/i18n/uz";
+import { getProfile } from "@/lib/shelf";
 import { todayInTashkent } from "@/lib/shelf-types";
+import { site } from "@/lib/site";
 import { getYearStats, type YearStats } from "@/lib/stats";
 import { cn } from "@/lib/utils";
+import { buildWrapUp, yearShareCard } from "@/lib/wrapup";
 
 export const metadata: Metadata = { title: uz.stats.title };
 
@@ -70,7 +74,7 @@ function GoalCard({ stats }: { stats: YearStats }) {
 async function StatsView({ searchParams }: { searchParams: PageProps<"/statistika">["searchParams"] }) {
   const sp = await searchParams;
   const requested = typeof sp.yil === "string" && /^\d{4}$/.test(sp.yil) ? Number(sp.yil) : undefined;
-  const stats = await getYearStats(requested);
+  const [stats, profile] = await Promise.all([getYearStats(requested), getProfile()]);
   const t = uz.stats;
   const today = todayInTashkent();
   const hasData = stats.finished.length > 0 || stats.activeDays > 0;
@@ -96,16 +100,19 @@ async function StatsView({ searchParams }: { searchParams: PageProps<"/statistik
             </Link>
           )}
           {hasData && (
-            <ShareStatsButton
-              year={stats.year}
-              booksRead={stats.finished.length}
-              goal={stats.goal}
-              pages={stats.pages}
-              minutes={stats.minutes}
-              longestStreak={stats.streak.longest}
-              activeDays={stats.activeDays}
-              topTopic={stats.byTopic[0]?.name}
-            />
+            <>
+              <Link href={stats.isCurrentYear ? "/sarhisob" : `/sarhisob?yil=${stats.year}`} className={buttonClasses({ variant: "secondary", size: "sm" })}>
+                {uz.wrapup.link(stats.year)}
+              </Link>
+              <ShareImageButton
+                card={yearShareCard(buildWrapUp(stats), profile?.display_name || profile?.username)}
+                fileName={`${site.slug}-${stats.year}.png`}
+                shareTitle={uz.share.yearTitle(stats.year)}
+                className={buttonClasses({ variant: "secondary", size: "sm" })}
+              >
+                {uz.share.button}
+              </ShareImageButton>
+            </>
           )}
           {stats.years.length > 1 && (
             <nav className="flex gap-1" aria-label="Yillar">
