@@ -10,7 +10,7 @@ function cut(text: string, max: number) {
   return text.length <= max ? text : `${text.slice(0, max - 1).replace(/\s+\S*$/, "")}…`;
 }
 
-// "«Atom odatlar» — Jeyms Klir. Qogʻoz (300 bet, Asaxiy Books, 2023), audio (5 soat), elektron. …"
+// "«Atom odatlar», Jeyms Klir. Qogʻoz (300 bet, Asaxiy Books, 2023), audio (5 soat), elektron. …"
 export function bookDescription(book: BookDetail) {
   const formats = book.formats.map((f) => {
     if (f === "paper") {
@@ -20,9 +20,9 @@ export function bookDescription(book: BookDetail) {
     if (f === "audio" && book.audio_seconds) return `audio (${formatDuration(book.audio_seconds)})`;
     return FORMAT_WORDS[f];
   });
-  const head = `«${book.title}»${book.author_names ? ` — ${book.author_names}` : ""}.`;
+  const head = `«${book.title}»${book.author_names ? `, ${book.author_names}` : ""}.`;
   const kinds = formats.length ? ` ${formats.join(", ").replace(/^./, (c) => c.toUpperCase())}.` : "";
-  const tail = book.description ? ` ${book.description.replace(/\s+/g, " ")}` : ` Oʻqing, tinglang va progressni ${site.name}'da kuzating.`;
+  const tail = book.description ? ` ${book.description.replace(/\s+/g, " ")}` : ` Oʻqing, tinglang va mutolaangizni ${site.name}da belgilab boring.`;
   return cut(`${head}${kinds}${tail}`, 160);
 }
 

@@ -69,7 +69,7 @@ export function answerInlineQuery(inlineQueryId: string, articles: InlineArticle
         message_text: a.message_text,
         parse_mode: "HTML",
       },
-      ...(a.url ? { reply_markup: { inline_keyboard: [[{ text: a.button_text ?? `${site.name}'da ochish ↗`, url: a.url }]] } } : {}),
+      ...(a.url ? { reply_markup: { inline_keyboard: [[{ text: a.button_text ?? `${site.name}da ochish ↗`, url: a.url }]] } } : {}),
     })),
   });
 }

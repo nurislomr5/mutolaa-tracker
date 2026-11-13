@@ -21,7 +21,7 @@ export async function generateMetadata({ params }: PageProps<"/nashriyot/[slug]"
   if (!publisher) return { title: uz.notFound.title };
   return {
     title: `${publisher.name} kitoblari`,
-    description: `${publisher.name} nashriyotining kitoblari: narxlar, betlar soni va yangi nashrlar — ${site.name} katalogida.`,
+    description: `${publisher.name} nashriyotining kitoblari, ularning narxi, betlar soni va yangi nashrlari ${site.name} katalogida.`,
     alternates: { canonical: `/nashriyot/${publisher.slug}` },
   };
 }

@@ -12,21 +12,21 @@ const sources = site.sources.map((s) => s.name).join(", ");
 export const privacy: LegalDoc = {
   title: "Maxfiylik siyosati",
   description: `${site.name} sizdan qanday maʼlumot oladi, uni nima uchun ishlatadi va uni qanday oʻchirish mumkin.`,
-  updated: "2026-11-10",
-  intro: `${site.name} — kitobxonlik kundaligi. Bu yerda sizdan qanday maʼlumot olishimiz, uni nima uchun ishlatishimiz va uni qanday oʻchirishingiz mumkinligi sodda tilda yozilgan.`,
+  updated: "2026-11-13",
+  intro: `${site.name} kitobxonlik kundaligidir. Bu sahifada sizdan qanday maʼlumot olishimiz, uni nima uchun ishlatishimiz va uni qanday oʻchirishingiz mumkinligi sodda tilda yozilgan.`,
   sections: [
     {
       heading: "Qanday maʼlumot saqlaymiz",
       body: [
         [
-          "Kirish maʼlumoti: email manzilingiz. Google orqali kirsangiz — Google hisobingizdagi ism, email va rasm. Telegram orqali kirsangiz — Telegram raqamingiz (ID), ismingiz va foydalanuvchi nomingiz. Parol saqlamaymiz — parol umuman ishlatilmaydi.",
+          "Kirish maʼlumoti: email manzilingiz. Google orqali kirsangiz, Google hisobingizdagi ism, email va rasm ham saqlanadi. Telegram orqali kirsangiz, Telegram raqamingiz (ID), ismingiz va foydalanuvchi nomingiz saqlanadi. Parol saqlamaymiz, chunki parol umuman ishlatilmaydi.",
           "Profil: siz kiritgan ism, foydalanuvchi nomi, yillik maqsad va eslatma sozlamalari.",
-          "Kitobxonlik maʼlumoti: javoningizdagi kitoblar va ularning holati, progress va oʻqish vaqtlari, baho va taqrizlar, qayd va iqtiboslar.",
+          "Kitobxonlik maʼlumoti: javoningizdagi kitoblar va ularning holati, qancha oʻqiganingiz va oʻqish vaqtlari, baho va taqrizlar, qayd va iqtiboslar.",
           "Boshqalar bilan bogʻliq maʼlumot: kimni kuzatayotganingiz, taqrizlarga bergan «Foydali» ovozlaringiz, klublarga aʼzoligingiz va muhokamadagi xabarlaringiz.",
           "Siz katalogga qoʻshgan kitoblar va muqova rasmlari, katalogdagi xato haqida yuborgan xabarlaringiz.",
           "Texnik maʼlumot: xosting xizmati server jurnallarida IP-manzil va brauzer turini qisqa muddat saqlaydi.",
-          "Tashrif statistikasi: qaysi sahifa necha marta ochilgani, qaysi saytdan kelingani, mamlakat, qurilma va brauzer turi. Bu maʼlumot umumlashtirilgan holda yigʻiladi — u hisobingizga bogʻlanmaydi va sizni shaxsan aniqlamaydi, cookie ishlatilmaydi.",
-          "Shikoyatlar: taqriz, klubdagi xabar yoki profil ustidan shikoyat yuborsangiz — shikoyat matni va kim yuborgani; sizning yozganingiz ustidan shikoyat tushsa — oʻsha matnning nusxasi. Shikoyatni faqat sayt maʼmuri koʻradi.",
+          "Tashrif statistikasi: qaysi sahifa necha marta ochilgani, qaysi saytdan kelingani, mamlakat, qurilma va brauzer turi. Bu maʼlumot umumlashtirilgan holda yigʻiladi: u hisobingizga bogʻlanmaydi, sizni shaxsan aniqlamaydi va cookie fayllari ishlatilmaydi.",
+          "Shikoyatlar: taqriz, klubdagi xabar yoki profil ustidan shikoyat yuborsangiz, shikoyat matni va uni kim yuborgani saqlanadi. Sizning yozganingiz ustidan shikoyat tushsa, oʻsha matnning nusxasi saqlanadi. Shikoyatni faqat sayt maʼmuri koʻradi.",
         ],
         "Reklama kodlari va sizni saytdan saytga kuzatadigan vositalar oʻrnatilmagan.",
       ],
@@ -35,9 +35,9 @@ export const privacy: LegalDoc = {
       heading: "Nima uchun ishlatamiz",
       body: [
         [
-          "Javoningiz, progressingiz va qaydlaringizni saqlash hamda statistikangizni koʻrsatish uchun.",
+          "Javoningiz, oʻqish tarixingiz va qaydlaringizni saqlash hamda statistikangizni koʻrsatish uchun.",
           "Oʻzingiz yoqqan Telegram eslatmalarini yuborish uchun.",
-          "Profilingizni ochiq qilgan boʻlsangiz — uni boshqalarga koʻrsatish uchun.",
+          "Profilingizni ochiq qilgan boʻlsangiz, uni boshqalarga koʻrsatish uchun.",
           "Xatolarni tuzatish va saytni suiisteʼmoldan himoya qilish uchun.",
         ],
         "Maʼlumotingizni sotmaymiz, reklama uchun ishlatmaymiz va reklama tarmoqlariga bermaymiz.",
@@ -46,11 +46,11 @@ export const privacy: LegalDoc = {
     {
       heading: "Maʼlumotingizni kim koʻradi",
       body: [
-        "Profil dastlab yopiq boʻladi — javoningizni faqat oʻzingiz koʻrasiz.",
+        "Profil dastlab yopiq boʻladi, yaʼni javoningizni faqat oʻzingiz koʻrasiz.",
         [
           "Profilni ochiq qilsangiz (Sozlamalar → «Profilim ochiq»), javoningiz, baholaringiz va taqrizlaringiz hammaga, jumladan qidiruv tizimlariga koʻrinadi.",
-          "Qaydlar, iqtiboslar va progress tarixi har doim faqat sizga koʻrinadi.",
-          "Klubga qoʻshilsangiz, ismingiz, klubning joriy kitobidagi progressingiz va muhokamadagi xabarlaringiz klub sahifasida koʻrinadi — profilingiz yopiq boʻlsa ham. Ochiq klub sahifasini istalgan odam koʻra oladi, yopiq klubni — faqat aʼzolari.",
+          "Qaydlar, iqtiboslar va oʻqish tarixi har doim faqat sizga koʻrinadi.",
+          "Klubga qoʻshilsangiz, ismingiz, klubning joriy kitobini qayerigacha oʻqiganingiz va muhokamadagi xabarlaringiz klub sahifasida koʻrinadi. Profilingiz yopiq boʻlsa ham shunday. Ochiq klub sahifasini istalgan odam, yopiq klubni esa faqat aʼzolari koʻra oladi.",
           "Email manzilingiz va Telegram raqamingiz boshqa foydalanuvchilarga hech qachon koʻrsatilmaydi.",
         ],
       ],
@@ -60,12 +60,12 @@ export const privacy: LegalDoc = {
       body: [
         "Sayt ishlashi uchun quyidagi xizmatlardan foydalanamiz. Maʼlumot ularga faqat koʻrsatilgan maqsadda uzatiladi:",
         [
-          "Supabase — maʼlumotlar bazasi va kirish tizimi.",
-          "Vercel — sayt xostingi va tashrif statistikasi (Vercel Web Analytics).",
-          "Telegram — bot, eslatmalar va Telegram orqali kirish.",
-          "GitHub — bazaning haftalik zaxira nusxalari shifrlangan holda shu yerda saqlanadi.",
-          "Google — Google orqali kirish. Botga yuborgan matnli yoki ovozli xabaringiz uni tushunish uchun Google Gemini sunʼiy intellektiga uzatiladi; xabar bilan birga javoningizdagi kitoblar nomi ham yuboriladi. Bot xabarlarini oʻzimiz saqlamaymiz — faqat natija (progress yoki qayd) javoningizga yoziladi.",
-          "Google Books va Open Library — kitobni ISBN boʻyicha qidirganda ularga faqat ISBN raqami yuboriladi.",
+          "Supabase: maʼlumotlar bazasi va kirish tizimi.",
+          "Vercel: sayt xostingi va tashrif statistikasi (Vercel Web Analytics).",
+          "Telegram: bot, eslatmalar va Telegram orqali kirish.",
+          "GitHub: bazaning haftalik zaxira nusxalari shifrlangan holda shu yerda saqlanadi.",
+          "Google: Google orqali kirish. Botga yuborgan yozma yoki ovozli xabaringiz uni tushunish uchun Google Gemini sunʼiy intellektiga uzatiladi; xabar bilan birga javoningizdagi kitoblar nomi ham yuboriladi. Bot xabarlarini oʻzimiz saqlamaymiz, faqat natija (necha bet oʻqiganingiz yoki qayd) javoningizga yoziladi.",
+          "Google Books va Open Library: kitobni ISBN boʻyicha qidirganda ularga faqat ISBN raqami yuboriladi.",
         ],
         "Bu xizmatlarning serverlari Oʻzbekistondan tashqarida joylashgan.",
       ],
@@ -74,7 +74,7 @@ export const privacy: LegalDoc = {
       heading: "Cookie va qurilmangizdagi maʼlumot",
       body: [
         [
-          "Cookie faqat hisobingizga kirgan holda qolishingiz uchun ishlatiladi. Reklama yoki kuzatuv cookie'lari yoʻq; tashrif statistikasi ham cookie'siz ishlaydi.",
+          "Cookie fayllari faqat hisobingizga kirgan holda qolishingiz uchun ishlatiladi. Reklama yoki kuzatuv cookie fayllari yoʻq, tashrif statistikasi ham cookie fayllarisiz ishlaydi.",
           "Brauzeringiz xotirasida tanlagan mavzu (yorugʻ yoki qorongʻi), alifbo, oʻqish taymeri va internetsiz ishlash uchun javoningizning nusxasi saqlanadi. Bular faqat sizning qurilmangizda turadi; hisobdan chiqsangiz, javon nusxasi oʻchadi.",
         ],
       ],
@@ -84,8 +84,8 @@ export const privacy: LegalDoc = {
       body: [
         [
           "Yuklab olish: javoningizni «Javonim» sahifasidan, qaydlaringizni «Qaydlar» sahifasidan fayl qilib yuklab olishingiz mumkin.",
-          "Telegram'ni uzish: Sozlamalar → Telegram bot → «Uzish».",
-          "Hisobni oʻchirish: Sozlamalar → «Hisobni oʻchirish». Profilingiz, javoningiz, progress, qayd va taqrizlaringiz, obuna va ovozlaringiz, klublardagi aʼzolik va xabarlaringiz, Telegram bogʻlanishi shu zahoti oʻchadi. Buni ortga qaytarib boʻlmaydi.",
+          "Telegramni uzish: Sozlamalar → Telegram bot → «Uzish».",
+          "Hisobni oʻchirish: Sozlamalar → «Hisobni oʻchirish». Profilingiz, javoningiz, oʻqish tarixingiz, qayd va taqrizlaringiz, obuna va ovozlaringiz, klublardagi aʼzolik va xabarlaringiz, Telegram bogʻlanishi shu zahoti oʻchadi. Buni ortga qaytarib boʻlmaydi.",
         ],
         "Siz ochgan klublar hisobingiz bilan birga, butun muhokamasi bilan oʻchadi. Siz katalogga qoʻshgan kitoblar katalogda qoladi, lekin ular endi sizga bogʻlanmagan boʻladi. Bazaning haftalik zaxira nusxalarida (ular shifrlangan holda saqlanadi) maʼlumot yana 90 kungacha saqlanib turishi mumkin.",
         "Hisobni oʻchirgach, Telegram yoki email orqali qayta kirsangiz, yangi boʻsh hisob ochiladi.",
@@ -101,18 +101,18 @@ export const privacy: LegalDoc = {
 export const terms: LegalDoc = {
   title: "Foydalanish shartlari",
   description: `${site.name}dan foydalanish qoidalari: hisob, siz yozgan matnlar, katalog maʼlumoti va javobgarlik.`,
-  updated: "2026-11-10",
+  updated: "2026-11-13",
   intro: `${site.name}dan foydalansangiz, quyidagi shartlarga rozi boʻlasiz. Ularni qisqa va sodda yozishga harakat qildik.`,
   sections: [
     {
       heading: "Xizmat haqida",
       body: [
-        `${site.name} — oʻqigan, oʻqiyotgan va oʻqimoqchi boʻlgan kitoblaringizni kuzatish uchun bepul xizmat.`,
+        `${site.name} oʻqigan, oʻqiyotgan va oʻqimoqchi boʻlgan kitoblaringizni bir joyda yuritish uchun moʻljallangan bepul xizmatdir.`,
         [
           `${site.name} kitob sotmaydi, kitob matni yoki audiosini saqlamaydi va tarqatmaydi.`,
           `Katalogdagi maʼlumot (nom, muallif, muqova, narx, sotuvda borligi) ochiq manbalardan olinadi (${sources}) va manbaga havola bilan koʻrsatiladi.`,
-          `${site.name} — mustaqil loyiha: u bu manbalarning rasmiy xizmati emas.`,
-          "Narx va sotuvda borligi haqidagi maʼlumot eskirgan boʻlishi mumkin — xarid qilishdan oldin sotuvchining oʻz saytida tekshiring.",
+          `${site.name} mustaqil loyiha boʻlib, bu manbalarning rasmiy xizmati emas.`,
+          "Narx va sotuvda borligi haqidagi maʼlumot eskirgan boʻlishi mumkin. Xarid qilishdan oldin sotuvchining oʻz saytida tekshiring.",
         ],
       ],
     },
@@ -138,13 +138,13 @@ export const terms: LegalDoc = {
           "mualliflik huquqi bilan himoyalangan kitoblarning toʻliq matni yoki katta qismlari (qisqa iqtibos mumkin);",
           "mavjud boʻlmagan yoki ataylab notoʻgʻri kiritilgan kitoblar.",
         ],
-        "Qoidani buzgan matnni oʻchirishimiz, takrorlansa — hisobni yopishimiz mumkin.",
+        "Qoidani buzgan matnni oʻchirishimiz, bu takrorlansa, hisobni yopishimiz mumkin.",
       ],
     },
     {
       heading: "Mualliflik huquqi egalari uchun",
       body: [
-        "Agar siz muallif, nashriyot yoki doʻkon vakili boʻlsangiz va kitobingiz haqidagi maʼlumot yoki muqova katalogdan olib tashlanishini yoxud tuzatilishini istasangiz — bizga yozing, tezda bajaramiz.",
+        "Agar siz muallif, nashriyot yoki doʻkon vakili boʻlsangiz va kitobingiz haqidagi maʼlumot yoki muqova katalogdan olib tashlanishini yoxud tuzatilishini istasangiz, bizga yozing, tezda bajaramiz.",
       ],
     },
     {
@@ -152,7 +152,7 @@ export const terms: LegalDoc = {
       body: [
         [
           "Xizmat «boricha» taqdim etiladi: u vaqtincha ishlamay qolishi, imkoniyatlari oʻzgarishi yoki toʻxtatilishi mumkin.",
-          "Telegram bot xabaringizni sunʼiy intellekt yordamida tushunadi va baʼzan xato qilishi mumkin — yozilgan progress va qaydlarni tekshirib turing.",
+          "Telegram bot xabaringizni sunʼiy intellekt yordamida tushunadi va baʼzan xato qilishi mumkin. Bot yozgan bet va qaydlarni tekshirib turing.",
           "Muhim qayd va roʻyxatlaringizni vaqti-vaqti bilan yuklab olib turing.",
           "Qonun yoʻl qoʻygan doirada, xizmatdan foydalanish yoki foydalana olmaslik oqibatida koʻrilgan zarar uchun javobgar emasmiz.",
         ],
@@ -160,7 +160,7 @@ export const terms: LegalDoc = {
     },
     {
       heading: "Hisobni yopish",
-      body: ["Istalgan payt Sozlamalar → «Hisobni oʻchirish» orqali hisobingizni va unga bogʻliq maʼlumotni oʻchirishingiz mumkin. Batafsil — maxfiylik siyosatida."],
+      body: ["Istalgan payt Sozlamalar → «Hisobni oʻchirish» orqali hisobingizni va unga bogʻliq maʼlumotni oʻchirishingiz mumkin. Batafsil maʼlumot maxfiylik siyosatida yozilgan."],
     },
     {
       heading: "Oʻzgarishlar",

@@ -214,7 +214,7 @@ export function ProgressForm({
             </select>
           </label>
           <label className="text-xs text-muted">
-            {t.progress}
+            {t.unitLabel}
             <select name="unit" value={unit} onChange={(e) => changeUnit(e.target.value as ProgressUnit)} className={selectClass}>
               {UNITS.map((u) => (
                 <option key={u} value={u}>
@@ -234,7 +234,7 @@ export function ProgressForm({
 
       <div className="flex items-end gap-2">
         <label className="flex-1 text-xs text-muted">
-          {t.current}
+          {t.currentBy[unit]}
           <Input name="current" type="number" min={0} inputMode="numeric" required value={current} onChange={(e) => setCurrent(e.target.value)} />
         </label>
         <span className="pb-2.5 text-muted">/</span>

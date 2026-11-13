@@ -6,7 +6,7 @@ export default function manifest(): MetadataRoute.Manifest {
   const icon = [{ src: "/icons/icon-192.png", sizes: "192x192", type: "image/png" }];
   return {
     id: "/",
-    name: `${site.name} — oʻzbekcha kitob kuzatuvchisi`,
+    name: `${site.name}: mutolaa kundaligi`,
     short_name: site.name,
     description: site.description,
     lang: "uz",

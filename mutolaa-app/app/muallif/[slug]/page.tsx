@@ -21,7 +21,7 @@ export async function generateMetadata({ params }: PageProps<"/muallif/[slug]">)
   const titles = author.books.slice(0, 3).map((b) => `«${b.title}»`).join(", ");
   return {
     title: author.name,
-    description: `${author.name} — ${author.books.length} ta kitob${titles ? `: ${titles}` : ""}. Oʻqing, tinglang va ${site.name}'da kuzating.`,
+    description: `${author.name} qalamiga mansub ${author.books.length} ta kitob${titles ? `: ${titles}` : ""}. Oʻqing, tinglang va ${site.name}da javoningizga qoʻshing.`,
     alternates: { canonical: `/muallif/${author.slug}` },
   };
 }

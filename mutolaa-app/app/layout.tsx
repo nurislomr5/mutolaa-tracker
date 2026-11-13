@@ -29,7 +29,7 @@ export const metadata: Metadata = {
   openGraph: { siteName: site.name, locale: "uz_UZ", type: "website" },
   twitter: { card: "summary_large_image" },
   title: {
-    default: `${site.name} — oʻzbekcha kitob kuzatuvchisi`,
+    default: `${site.name}: shaxsiy mutolaa kundaligi va kitoblar katalogi`,
     template: `%s · ${site.name}`,
   },
   description: site.description,

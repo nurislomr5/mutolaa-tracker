@@ -3,7 +3,7 @@ export const site = {
   name: "Xatchoʻp",
   // lotincha, apostrofsiz shakli — fayl nomlari uchun
   slug: "xatchop",
-  description: "Oʻqigan, oʻqiyotgan va oʻqimoqchi boʻlgan kitoblaringizni oʻzbek tilida kuzating.",
+  description: "Oʻqigan kitoblaringiz, kunlik mutolaangiz va qaydlaringiz uchun shaxsiy kundalik hamda oʻzbek nashriyotlari kitoblarining yagona katalogi.",
   // katalog maʼlumoti manbalari (futerda koʻrsatiladi)
   sources: [
     { name: "Mutolaa", url: "https://mutolaa.com" },

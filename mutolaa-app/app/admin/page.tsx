@@ -76,7 +76,7 @@ async function Panel() {
         <Stat label={s.publicProfiles} value={stats.public_profiles} />
       </div>
       <p className="mt-2 text-xs text-muted">
-        {s.active} — {s.activeHint}. {s.books} — {s.booksHint}.
+        {s.active}: {s.activeHint}. {s.books}: {s.booksHint}.
       </p>
 
       <Card className="mt-6">

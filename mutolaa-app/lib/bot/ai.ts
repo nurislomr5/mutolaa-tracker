@@ -39,7 +39,7 @@ export type BookContext = {
 };
 
 function instruction(books: BookContext[]) {
-  return `Sen "${site.name}" kitob kuzatuvchisining Telegram yordamchisisan. Foydalanuvchi oʻzbek tilida (lotin yoki kirill, ba'zan ruscha) yozadi yoki gapiradi.
+  return `Sen "${site.name}" mutolaa kundaligi saytining Telegram yordamchisisan. Foydalanuvchi oʻzbek tilida (lotin yoki kirill, ba'zan ruscha) yozadi yoki gapiradi.
 Uning javonidagi kitoblar (JSON): ${JSON.stringify(books)}
 
 Xabarni tahlil qilib FAQAT shu JSON obyektni qaytar:

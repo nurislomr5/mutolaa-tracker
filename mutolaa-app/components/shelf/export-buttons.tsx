@@ -27,7 +27,7 @@ export function ExportNotesButton({ notes }: { notes: NoteWithBook[] }) {
       byBook.set(title, list);
     }
 
-    const lines: string[] = [`# ${site.name} — ${uz.notes.title}`, ""];
+    const lines: string[] = [`# ${site.name}: ${uz.notes.title}`, ""];
     for (const [bookTitle, items] of byBook) {
       lines.push(`## ${bookTitle}`, "");
       for (const n of items) {

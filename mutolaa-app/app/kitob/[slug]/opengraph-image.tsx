@@ -59,7 +59,7 @@ export default async function Image({ params }: { params: Promise<{ slug: string
           <div style={{ display: "flex", alignItems: "center", gap: 14, fontSize: 30, color: C.text }}>
             <div style={{ display: "flex", width: 44, height: 44, borderRadius: 10, background: C.accent }} />
             <span style={{ fontWeight: 700 }}>{site.name}</span>
-            <span style={{ color: C.muted }}>— oʻzbekcha kitob kuzatuvchisi</span>
+            <span style={{ color: C.muted }}>· shaxsiy mutolaa kundaligi</span>
           </div>
         </div>
       </div>
