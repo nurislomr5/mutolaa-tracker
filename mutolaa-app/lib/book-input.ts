@@ -1,5 +1,6 @@
 import { z } from "zod";
 import { uz } from "@/lib/i18n/uz";
+import { normalizeApostrophes } from "@/lib/text/clean";
 
 // Foydalanuvchi kitobini qoʻshish va tahrirlash formalari uchun umumiy validatsiya
 
@@ -8,8 +9,9 @@ const optionalInt = (min: number, max: number) =>
   z.preprocess((v) => (v === "" || v == null ? undefined : v), z.coerce.number().int().min(min).max(max).optional());
 
 export const bookInputSchema = z.object({
-  title: z.string().trim().min(1).max(200),
-  authors: z.string().trim().min(1).max(300),
+  // apostrof turlari bir xil saqlanadi: O'tkan -> Oʻtkan
+  title: z.string().trim().min(1).max(200).transform(normalizeApostrophes),
+  authors: z.string().trim().min(1).max(300).transform(normalizeApostrophes),
   formats: z.array(z.enum(["paper", "ebook", "audio"])).min(1),
   page_count: optionalInt(1, 10_000),
   publisher: z.string().trim().max(120).optional(),
@@ -26,7 +28,7 @@ export const bookInputSchema = z.object({
     .max(500)
     .refine((v) => v === "" || /^https:\/\/\S+$/.test(v), uz.addBook.coverHint)
     .optional(),
-  description: z.string().trim().max(3000).optional(),
+  description: z.string().trim().max(3000).transform(normalizeApostrophes).optional(),
 });
 
 export type BookInput = z.infer<typeof bookInputSchema>;

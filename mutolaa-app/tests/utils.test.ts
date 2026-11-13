@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { parseAuthors } from "@/lib/book-input";
+import { bookInputSchema, parseAuthors } from "@/lib/book-input";
 import { allowBotRate } from "@/lib/bot/handlers";
 import { coverPathFromUrl, sniffImageType } from "@/lib/covers";
 import { formatCount, formatDate, formatDuration } from "@/lib/format";
@@ -118,6 +118,11 @@ describe("kitob formasi", () => {
   it("mualliflar roʻyxati", () => {
     expect(parseAuthors(" Abdulla Qodiriy, , Choʻlpon,Abdulla Qodiriy ")).toEqual(["Abdulla Qodiriy", "Choʻlpon"]);
   });
+
+  it("apostrof turlari bir xillashadi", () => {
+    const parsed = bookInputSchema.parse({ title: " O'tkan kunlar ", authors: "Cho’lpon, G`afur G'ulom", formats: ["paper"], description: "She'rlar to'plami" });
+    expect(parsed).toMatchObject({ title: "Oʻtkan kunlar", authors: "Choʻlpon, Gʻafur Gʻulom", description: "Sheʼrlar toʻplami" });
+  });
 });
 
 describe("nashriyot taxalluslari", () => {
@@ -209,6 +214,14 @@ describe("Hilol-Nashr (hilolnashr.uz) parseri", () => {
     expect(workKey("Бахтиёр оила (совғабоп, қутисиз)")).toBe(workKey("Baxtiyor oila"));
     expect(workKey("Сийрати набавия (1-жуз)")).not.toBe(workKey("Сийрати набавия (2-жуз)"));
     expect(workKey("Зикр аҳлидан сўранг тўплами 4-жилд (экспорт учун)")).toBe(workKey("Зикр аҳлидан сўранг тўплами 4-жилд"));
+  });
+
+  it("doʻkon izohi olib tashlanadi, oʻzbekcha nomda apostrof bir xillashadi", () => {
+    const html = page("<b>ISBN:</b> 978-9910-273-65-0");
+    expect(parseHilolPage(html.replace("«Хаёла»", "Бахтиёр оила (юмшоқ муқова)"), "baxtiyor-oila")?.title).toBe("Бахтиёр оила");
+    expect(parseHilolPage(html.replace("«Хаёла»", "O'zbek tilida so'zlashamiz (lotincha)"), "ozbek-tilida")?.title).toBe("Oʻzbek tilida soʻzlashamiz (lotincha)");
+    // boshqa tildagi nashr nomiga tegilmaydi
+    expect(parseHilolPage(html.replace("«Хаёла»", "King's Arabic"), "kings-arabic")?.title).toBe("King's Arabic");
   });
 
   it("tuzuvchini muallif sifatida oladi", () => {

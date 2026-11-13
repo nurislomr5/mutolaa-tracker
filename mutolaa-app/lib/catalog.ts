@@ -1,4 +1,5 @@
 import { cacheLife, cacheTag } from "next/cache";
+import { hasCleanTitle, isCyrillic, orderPublishers, pickDiverse, uniqueByTitle } from "@/lib/showcase";
 import { createPublicClient } from "@/lib/supabase/public";
 
 // Katalog maʼlumotlari kamdan-kam oʻzgaradi (import haftasiga bir marta) — soatlab keshlanadi.
@@ -60,7 +61,8 @@ export type BookSource = {
   publisher: { name: string; slug: string } | null;
 };
 
-export type Publisher = { name: string; slug: string; count: number };
+// uzCount — oʻzbek tilidagi kitoblari soni (publisher_book_counts, 20261116000019); eski bazada boʻlmaydi
+export type Publisher = { name: string; slug: string; count: number; uzCount?: number };
 
 export type Topic = { id: number; name: string; slug: string; color: string | null; count: number };
 
@@ -290,10 +292,16 @@ export async function getPublishers() {
   // kitoblar soni nashrlar (book_sources) orqali bogʻlanganlari bilan birga, takrorsiz
   const { data, error } = await createPublicClient().rpc("publisher_book_counts");
   if (error) fail("Nashriyotlar", error.message);
-  return ((data ?? []) as { name: string; slug: string; count: number | string }[])
-    .map((p): Publisher => ({ name: p.name, slug: p.slug, count: Number(p.count) }))
-    .filter((p) => p.count > 0)
-    .sort((a, b) => b.count - a.count || a.name.localeCompare(b.name));
+  const publishers = ((data ?? []) as { name: string; slug: string; count: number | string; uz_count?: number | string | null }[])
+    .map((p): Publisher => ({
+      name: p.name,
+      slug: p.slug,
+      count: Number(p.count),
+      ...(p.uz_count == null ? {} : { uzCount: Number(p.uz_count) }),
+    }))
+    .filter((p) => p.count > 0);
+  // avval oʻzbek nashriyotlari, soʻng qolganlari
+  return orderPublishers(publishers);
 }
 
 export async function getPublisher(slug: string) {
@@ -306,22 +314,48 @@ export async function getPublisher(slug: string) {
   return (data as { id: number; name: string; slug: string } | null) ?? null;
 }
 
-// Bosh sahifa: eng soʻnggi qogʻoz nashrlar (chop etilgan yili, soʻng katalogga qoʻshilgani boʻyicha)
-export async function getNewPaperBooks(limit: number) {
+// Bosh sahifa: oʻzbek tilidagi eng soʻnggi bosma nashrlar (chop etilgan yili, soʻng katalogga qoʻshilgani boʻyicha).
+// Muqovasi bor va nomi toza kitoblar olinadi; bitta nashriyot vitrinani egallab olmasligi uchun
+// ketma-ket ikkitadan ortiq kitobi chiqmaydi. Lotin yozuvidagi nomlar yetarli boʻlsa, kirillchalari qoʻshilmaydi.
+// Xato otilmaydi (getSimilarBooks kabi): boʻlim ixtiyoriy, xato boʻlsa bosh sahifa usiz ochiladi.
+const NEW_BOOKS_POOL = 400;
+
+export async function getNewPaperBooks(limit: number): Promise<BookCardData[]> {
   "use cache";
-  cacheLife("hours");
   cacheTag("catalog");
 
+  // doʻkon sahifasidagi xato yillar ("20241") roʻyxat boshiga chiqib qolmasin
+  const maxYear = new Date().getFullYear() + 1;
   const { data, error } = await createPublicClient()
     .from("books")
-    .select(CARD_COLUMNS)
+    .select(`${CARD_COLUMNS}, publisher_id, edition:book_sources!inner(publisher_id)`)
     .contains("formats", ["paper"])
     .not("cover_url", "is", null)
+    // aynan bosma nashrning oʻzi oʻzbek tilida boʻlsin
+    .contains("edition.langs", ["uz"])
+    .contains("edition.formats", ["paper"])
+    .or(`published_year.is.null,published_year.lte.${maxYear}`)
     .order("published_year", { ascending: false, nullsFirst: false })
     .order("first_seen_at", { ascending: false })
-    .limit(limit);
-  if (error) fail("Yangi kitoblar", error.message);
-  return (data ?? []) as unknown as BookCardData[];
+    .order("id")
+    .limit(NEW_BOOKS_POOL);
+  if (error) {
+    console.error("[yangi kitoblar]", error.message);
+    cacheLife("minutes");
+    return [];
+  }
+  cacheLife("hours");
+
+  type Row = BookCardData & { publisher_id?: number | null; edition?: { publisher_id: number | null }[] };
+  const publisherOf = (b: Row) => b.publisher_id ?? b.edition?.find((e) => e.publisher_id != null)?.publisher_id ?? null;
+  const clean = uniqueByTitle(((data ?? []) as unknown as Row[]).filter((b) => hasCleanTitle(b.title)));
+  const latin = clean.filter((b) => !isCyrillic(b.title));
+  return pickDiverse(latin.length >= limit ? latin : clean, publisherOf, limit).map((b) => {
+    const card = { ...b };
+    delete card.publisher_id;
+    delete card.edition;
+    return card as BookCardData;
+  });
 }
 
 // Kitob sahifasi: rukn va janrlari mos kitoblar (similar_books, 20261114000016). Tartibni funksiya oʻzi beradi.

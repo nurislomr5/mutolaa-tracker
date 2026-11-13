@@ -147,6 +147,8 @@ async function Personal() {
   );
 }
 
+const HOME_TOPICS = 14;
+
 async function Popular() {
   const [books, topics, newBooks, publishers] = await Promise.all([
     getPopularBooks(12),
@@ -154,6 +156,8 @@ async function Popular() {
     getNewPaperBooks(12),
     getPublishers(),
   ]);
+  // eng koʻp kitobli ruknlar; toʻliq roʻyxat — /ruknlar sahifasida
+  const topTopics = [...topics].sort((a, b) => b.count - a.count || a.name.localeCompare(b.name)).slice(0, HOME_TOPICS);
   return (
     <Container className="py-14">
       {newBooks.length > 0 && (
@@ -163,7 +167,7 @@ async function Popular() {
               <h2 className="font-serif text-2xl font-semibold">{uz.publishers.newBooks}</h2>
               <p className="text-sm text-muted">{uz.publishers.newBooksHint}</p>
             </div>
-            <Link href="/kitoblar?format=paper&sort=new" className="shrink-0 text-sm text-accent hover:underline">
+            <Link href="/kitoblar?format=paper&til=uz&sort=new" className="shrink-0 text-sm text-accent hover:underline">
               {uz.popular.seeAll}
             </Link>
           </div>
@@ -202,9 +206,14 @@ async function Popular() {
         </>
       )}
 
-      <h2 className="mb-4 mt-14 font-serif text-2xl font-semibold">{uz.popular.topicsTitle}</h2>
+      <div className="mb-4 mt-14 flex items-baseline justify-between">
+        <h2 className="font-serif text-2xl font-semibold">{uz.popular.topicsTitle}</h2>
+        <Link href="/ruknlar" className="text-sm text-accent hover:underline">
+          {uz.popular.allTopics}
+        </Link>
+      </div>
       <div className="flex flex-wrap gap-2">
-        {topics.map((tp) => (
+        {topTopics.map((tp) => (
           <Link
             key={tp.slug}
             href={`/kitoblar?rukn=${tp.slug}`}

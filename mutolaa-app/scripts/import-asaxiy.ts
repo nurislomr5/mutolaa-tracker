@@ -11,6 +11,7 @@
  */
 import type { SupabaseClient } from "@supabase/supabase-js";
 import { PUBLISHER_NAMES, publisherSlug } from "../lib/publishers";
+import { cleanTitle, normalizeApostrophes, saneYear, titleNoise } from "../lib/text/clean";
 import { slugify, uzNormalize } from "../lib/text/normalize";
 import { checkHealth, cliArgs, createAdmin, decodeHtml, fetchText, hasEditedAt, jsonLdNodes, loadEnv, runPool } from "./lib/common";
 
@@ -194,6 +195,19 @@ async function collectSlugs(): Promise<string[]> {
   return [...slugs];
 }
 
+// Nomdagi doʻkon izlari ("(Yumshoq muqova)", "[Asaxiy]"), xato yil ("20241") va oʻzbekcha nashrdagi apostrof turlari.
+// Bazadagi mavjud yozuvlar ham xuddi shu qoidalar bilan tozalangan (20261116000019).
+function tidy(p: Parsed, noise: ReadonlySet<string>): Parsed {
+  const fix = (text: string) => (p.language === "uz" ? normalizeApostrophes(text) : text);
+  return {
+    ...p,
+    title: fix(cleanTitle(p.title, noise)),
+    authors: p.authors.map(fix),
+    description: p.description ? fix(p.description) : p.description,
+    published_year: saneYear(p.published_year),
+  };
+}
+
 // ---------- Bazaga yozish ----------
 
 class Saver {
@@ -201,13 +215,16 @@ class Saver {
   private usedSlugs = new Set<string>();
   stats = { matched: 0, created: 0 };
   private protectEdited = false;
+  // nomdagi "(Nashriyot nomi)" izlari uchun
+  noise = titleNoise();
 
   constructor(private db: SupabaseClient) {}
 
   async init() {
     this.protectEdited = await hasEditedAt(this.db);
-    const { data } = await this.db.from("publishers").select("id, slug");
+    const { data } = await this.db.from("publishers").select("id, name, slug").limit(5000);
     for (const p of data ?? []) this.publishers.set(p.slug, p.id);
+    this.noise = titleNoise((data ?? []).flatMap((p) => [p.name as string, p.slug as string]));
   }
 
   // Taxalluslar (lib/publishers.ts) asosiy nashriyotga bogʻlanadi: "\"Sharq\" NMAK" -> Sharq
@@ -219,7 +236,7 @@ class Saver {
     if (cached) return cached;
     const { data, error } = await this.db
       .from("publishers")
-      .upsert({ name: PUBLISHER_NAMES[slug] ?? name, slug }, { onConflict: "slug" })
+      .upsert({ name: PUBLISHER_NAMES[slug] ?? normalizeApostrophes(name), slug }, { onConflict: "slug" })
       .select("id")
       .single();
     if (error) throw new Error(`publishers: ${error.message}`);
@@ -396,7 +413,8 @@ async function main() {
 
   await runPool(slugs, CONCURRENCY, DELAY_MS, async (slug, i) => {
     const html = await fetchText(`${BASE}/product/${slug}`);
-    const parsed = html ? parseProduct(html, slug) : null;
+    const raw = html ? parseProduct(html, slug) : null;
+    const parsed = raw ? tidy(raw, saver?.noise ?? titleNoise()) : null;
     if (!html) failed++;
     else if (!parsed) skipped++;
     else if (DRY_RUN) {

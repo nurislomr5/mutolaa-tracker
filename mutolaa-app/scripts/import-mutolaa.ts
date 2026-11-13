@@ -12,6 +12,7 @@
  */
 import { createClient, type SupabaseClient } from "@supabase/supabase-js";
 import { EDIT_PROTECTED_FIELDS, keepEdited } from "../lib/book-edit";
+import { classicUzbekLatin, cleanMutolaaSlug, cleanTitle, normalizeApostrophes, titleNoise } from "../lib/text/clean";
 import { slugify } from "../lib/text/normalize";
 import { checkHealth, hasEditedAt, loadEnv } from "./lib/common";
 
@@ -64,6 +65,8 @@ type MutolaaBook = {
 };
 
 type ParsedBook = {
+  // Mutolaa'dagi asl slug (manba havolasi va book_sources.external_id); book.slug — saytdagi manzil
+  mutolaaSlug: string;
   book: {
     slug: string;
     mutolaa_id: number | null;
@@ -213,6 +216,7 @@ function fromMutolaa(b: MutolaaBook, slug: string): ParsedBook {
   const publisher = typeof b.publisher === "string" ? b.publisher : (b.publisher?.name ?? null);
 
   return {
+    mutolaaSlug: slug,
     book: {
       slug,
       mutolaa_id: b.id,
@@ -271,6 +275,7 @@ function fromJsonLd(b: JsonLdBook, slug: string): ParsedBook | null {
   const authors = (Array.isArray(b.author) ? b.author : b.author ? [b.author] : []).map((a) => a.name?.trim()).filter(Boolean) as string[];
   const genres = (Array.isArray(b.genre) ? b.genre : b.genre ? [b.genre] : []).filter(Boolean);
   return {
+    mutolaaSlug: slug,
     book: {
       slug,
       mutolaa_id: null,
@@ -300,11 +305,68 @@ function fromJsonLd(b: JsonLdBook, slug: string): ParsedBook | null {
   };
 }
 
+// Mutolaa yangi lotin alifbosida yozadi (ö, ğ, ş, ç) — barcha matnlar saytdagi amaldagi yozuvga oʻgiriladi
+// (oʻ, gʻ, sh, ch). source_raw asl holicha qoladi.
+function classic(p: ParsedBook): ParsedBook {
+  const fix = (text: string | null) => (text ? classicUzbekLatin(text) : text);
+  const named = <T extends { name: string }>(items: T[]) => items.map((it) => ({ ...it, name: classicUzbekLatin(it.name) }));
+  return {
+    ...p,
+    book: {
+      ...p.book,
+      title: classicUzbekLatin(p.book.title),
+      author_names: fix(p.book.author_names),
+      description: fix(p.book.description),
+      narrator: fix(p.book.narrator),
+      publisher: fix(p.book.publisher),
+      audio_chapters: p.book.audio_chapters?.map((c) => ({ ...c, title: classicUzbekLatin(c.title) })) ?? null,
+    },
+    authors: named(p.authors),
+    genres: named(p.genres),
+    topics: named(p.topics),
+  };
+}
+
 function parseBookPage(html: string, slug: string): ParsedBook | null {
   const rsc = findBookInPayload(rscPayload(html), slug);
-  if (rsc) return fromMutolaa(rsc, slug);
+  if (rsc) return classic(fromMutolaa(rsc, slug));
   const ld = findJsonLdBook(html);
-  return ld ? fromJsonLd(ld, slug) : null;
+  const parsed = ld ? fromJsonLd(ld, slug) : null;
+  return parsed ? classic(parsed) : null;
+}
+
+// Nom va matnlarni tozalash: doʻkon izlari va apostrof turlari. Bazadagi mavjud yozuvlar ham xuddi shu
+// qoidalar bilan tozalangan (20261116000019) — importer boshqacha yozsa, har hafta eski holiga qaytib qolardi.
+function tidy(p: ParsedBook, noise: ReadonlySet<string>): ParsedBook {
+  const fix = (text: string | null) => (text ? normalizeApostrophes(text) : text);
+  const named = <T extends { name: string }>(items: T[]) => items.map((it) => ({ ...it, name: normalizeApostrophes(it.name) }));
+  return {
+    ...p,
+    book: {
+      ...p.book,
+      title: normalizeApostrophes(cleanTitle(p.book.title, noise)),
+      author_names: fix(p.book.author_names),
+      description: fix(p.book.description),
+      narrator: fix(p.book.narrator),
+    },
+    authors: named(p.authors),
+    genres: named(p.genres),
+    topics: named(p.topics),
+  };
+}
+
+// Saytdagi manzil. Mavjud kitobniki oʻzgarmaydi; yangi kitobga Mutolaa slug'idagi apostrof izlaridan
+// tozalangan ("o-tkan-kunlar" -> "otkan-kunlar") va band boʻlmagan manzil beriladi.
+function siteSlug(mutolaaSlug: string, title: string, catalog: Catalog | null): string {
+  const want = cleanMutolaaSlug(mutolaaSlug, title);
+  if (!catalog) return want;
+  const known = catalog.known.get(mutolaaSlug);
+  if (known) return known;
+  let slug = want;
+  for (let n = 2; catalog.taken.has(slug); n++) slug = `${want}-${n}`;
+  catalog.taken.add(slug);
+  catalog.known.set(mutolaaSlug, slug);
+  return slug;
 }
 
 // ---------- Bazaga yozish ----------
@@ -404,7 +466,7 @@ async function flush(
     batch.map((b) => ({
       book_id: idBySlug.get(b.book.slug),
       source: "mutolaa",
-      external_id: b.book.slug,
+      external_id: b.mutolaaSlug,
       url: b.book.source_url,
       formats: b.book.formats,
       cover_url: b.book.cover_url,
@@ -443,21 +505,39 @@ async function flush(
   }
 }
 
-async function freshSlugs(db: SupabaseClient): Promise<Set<string>> {
-  const since = new Date(Date.now() - FRESH_DAYS * 86_400_000).toISOString();
+// Bazadagi kitoblar: band manzillar, Mutolaa slug'i -> saytdagi manzil va yaqinda yangilangan Mutolaa kitoblari.
+// Saytdagi manzil Mutolaa slug'idan farq qilishi mumkin (20261116000019), shuning uchun kitob
+// manba havolasi (source_url) oxiridagi asl slug orqali taniladi.
+type Catalog = { taken: Set<string>; known: Map<string, string>; fresh: Set<string>; noise: Set<string> };
+
+async function loadCatalog(db: SupabaseClient): Promise<Catalog> {
+  const since = Date.now() - FRESH_DAYS * 86_400_000;
+  const prefix = `${BASE}/uz/book/`;
+  const taken = new Set<string>();
+  const known = new Map<string, string>();
   const fresh = new Set<string>();
   for (let from = 0; ; from += 1000) {
     const { data, error } = await db
       .from("books")
-      .select("slug")
-      .eq("source", "mutolaa")
-      .gte("imported_at", since)
+      .select("slug, source, source_url, imported_at")
+      .order("id")
       .range(from, from + 999);
     if (error) throw new Error(`books: ${error.message}`);
-    for (const r of data ?? []) fresh.add(r.slug);
+    for (const r of data ?? []) {
+      taken.add(r.slug);
+      if (r.source !== "mutolaa") continue;
+      const url = (r.source_url as string | null) ?? "";
+      const mutolaaSlug = url.startsWith(prefix) && url.length > prefix.length ? url.slice(prefix.length) : (r.slug as string);
+      known.set(mutolaaSlug, r.slug);
+      if (r.imported_at && Date.parse(r.imported_at) >= since) fresh.add(mutolaaSlug);
+    }
     if (!data || data.length < 1000) break;
   }
-  return fresh;
+  // nomdagi "(Nashriyot nomi)" izlari uchun
+  const { data: publishers, error } = await db.from("publishers").select("name, slug").limit(5000);
+  if (error) throw new Error(`publishers: ${error.message}`);
+  const noise = titleNoise((publishers ?? []).flatMap((p) => [p.name as string, p.slug as string]));
+  return { taken, known, fresh, noise };
 }
 
 // ---------- Asosiy ----------
@@ -474,19 +554,26 @@ async function main() {
   let slugs = await loadSlugs();
   const listed = slugs.length;
   console.log(`Sitemap: ${slugs.length} ta kitob`);
-  if (db && !FORCE && !ONLY_SLUG) {
-    const fresh = await freshSlugs(db);
-    slugs = slugs.filter((s) => !fresh.has(s));
-    console.log(`Oxirgi ${FRESH_DAYS} kunda yangilanganlar oʻtkazib yuborildi: ${fresh.size}`);
+  const catalog = db ? await loadCatalog(db) : null;
+  if (catalog && !FORCE && !ONLY_SLUG) {
+    slugs = slugs.filter((s) => !catalog.fresh.has(s));
+    console.log(`Oxirgi ${FRESH_DAYS} kunda yangilanganlar oʻtkazib yuborildi: ${catalog.fresh.size}`);
   }
-  if (db) {
-    // Takror sifatida boshqa kitobga qoʻshilgan (admin birlashtirgan) kitoblar qayta yaratilmasin
-    const { data: merged, error } = await db.from("book_redirects").select("old_slug");
-    if (error) throw new Error(`book_redirects: ${error.message}`);
-    const mergedSlugs = new Set((merged ?? []).map((r) => r.old_slug as string));
+  if (db && catalog) {
+    // Takror sifatida boshqa kitobga qoʻshilgan (admin birlashtirgan) kitoblar qayta yaratilmasin.
+    // Manzili oʻzgargan kitobning eski manzili ham shu jadvalda turadi — u bazada bor, yangilanaveradi.
+    const mergedSlugs = new Set<string>();
+    for (let from = 0; ; from += 1000) {
+      const { data: merged, error } = await db.from("book_redirects").select("old_slug").order("old_slug").range(from, from + 999);
+      if (error) throw new Error(`book_redirects: ${error.message}`);
+      for (const r of merged ?? []) mergedSlugs.add(r.old_slug as string);
+      if (!merged || merged.length < 1000) break;
+    }
     const before = slugs.length;
-    slugs = slugs.filter((s) => !mergedSlugs.has(s));
+    slugs = slugs.filter((s) => !mergedSlugs.has(s) || catalog.known.has(s));
     if (before !== slugs.length) console.log(`Birlashtirilgan (takror) kitoblar oʻtkazib yuborildi: ${before - slugs.length}`);
+    // yangi kitobga eski manzil berilmasin — aks holda yoʻnaltirish bilan toʻqnashadi
+    for (const s of mergedSlugs) catalog.taken.add(s);
   }
   slugs = slugs.slice(0, LIMIT);
   console.log(`Yuklanadi: ${slugs.length} ta`);
@@ -507,7 +594,10 @@ async function main() {
     while (queue < slugs.length) {
       const slug = slugs[queue++];
       const html = await fetchText(`${BASE}/uz/book/${encodeURIComponent(slug)}`);
-      const parsed = html ? parseBookPage(html, slug) : null;
+      const raw = html ? parseBookPage(html, slug) : null;
+      const parsed = raw ? tidy(raw, catalog?.noise ?? titleNoise()) : null;
+      // manzil Mutolaa'dagi asl nomdan yasaladi (slug ham oʻsha nomdan yasalgan)
+      if (raw && parsed) parsed.book.slug = siteSlug(slug, raw.book.title, catalog);
       if (!parsed) {
         failed++;
         console.warn(`  ✗ ${slug}: maʼlumot topilmadi`);

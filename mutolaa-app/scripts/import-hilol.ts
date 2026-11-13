@@ -12,6 +12,7 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
 import { findBookByIsbn } from "../lib/isbn-lookup";
 import { PUBLISHER_NAMES, publisherSlug } from "../lib/publishers";
+import { cleanTitle as stripShopNoise, normalizeApostrophes, titleNoise } from "../lib/text/clean";
 import { slugify, uzNormalize } from "../lib/text/normalize";
 import { checkHealth, cliArgs, createAdmin, decodeHtml, fetchText, loadEnv, runPool } from "./lib/common";
 
@@ -113,8 +114,11 @@ export function workKey(title: string) {
 const NOT_A_BOOK = /плакат|plakat|banner|баннер|(?:^|[\s-])диск|(?:^|[\s-])disk\b|\bmp3\b|мр3/i;
 
 // Sarlavha boshidagi «…» qoʻshtirnoqlarni olib tashlaymiz: «Хаёла» → Хаёла, «Сийрати набавия» (1-жуз) → Сийрати набавия (1-жуз)
+// Qavs ichidagi doʻkon izohlari ham ("(yumshoq muqova)") olib tashlanadi — lib/text/clean.ts
+const SHOP_NOISE = titleNoise(["Hilol-Nashr", "hilol-nashr"]);
+
 function cleanTitle(raw: string) {
-  return raw.replace(/^«([^»]+)»\s*/, "$1 ").trim();
+  return stripShopNoise(raw.replace(/^«([^»]+)»\s*/, "$1 ").trim(), SHOP_NOISE);
 }
 
 // Til: slug oxiridagi belgi (-qz, -qr, -rus) yoki nomdagi izoh; qozoq/qoraqalpoq nashrlari nomida "рус" ham uchraydi
@@ -134,8 +138,12 @@ const isCompilerKey = (k: string) => /тайёрловчи|tayyorlovchi|тўпл
 
 export function parseHilolPage(html: string, slug: string): ParsedHilol | null {
   const h1 = html.match(/<h1 class="title page-title">\s*(?:<span>)?([\s\S]*?)(?:<\/span>)?\s*<\/h1>/i);
-  const title = h1 ? cleanTitle(clean(h1[1].replace(/<[^>]+>/g, ""))) : "";
-  if (!title || NOT_A_BOOK.test(`${title} ${slug}`)) return null;
+  const rawTitle = h1 ? cleanTitle(clean(h1[1].replace(/<[^>]+>/g, ""))) : "";
+  if (!rawTitle || NOT_A_BOOK.test(`${rawTitle} ${slug}`)) return null;
+  const language = guessLanguage(slug, rawTitle);
+  // oʻzbekcha (lotin) nomlarda apostrof turlari bir xil boʻlsin: O'zbek -> Oʻzbek
+  const fix = (text: string) => (language === "uz" ? normalizeApostrophes(text) : text);
+  const title = fix(rawTitle);
 
   const fields = descriptionFields(html);
   // "Номи: «Иймон калималари» (плакат)" — sarlavhada koʻrinmagan plakat
@@ -144,7 +152,7 @@ export function parseHilolPage(html: string, slug: string): ParsedHilol | null {
   const authors = rawAuthor
     ? rawAuthor
         .split(/\s*[,;]\s*/)
-        .map((a) => a.trim())
+        .map((a) => fix(a.trim()))
         .filter((a) => a.length > 1 && a.length < 80)
     : [];
   const isbnRaw = field(fields, "isbn");
@@ -175,7 +183,7 @@ export function parseHilolPage(html: string, slug: string): ParsedHilol | null {
     publisher: cleanPublisher(field(fields, "нашриёт", "nashriyot")) ?? "Hilol-Nashr",
     cover_type: field(fields, "муқоваси", "muqovasi", "муқова", "muqova"),
     script: /[а-яёўқғҳ]/i.test(title) ? "cyrillic" : "latin",
-    language: guessLanguage(slug, title),
+    language,
     price: price && price > 0 ? price : null,
     in_stock: stock ? stock === "in-stock" : true,
   };
@@ -268,7 +276,7 @@ async function saveHilol(db: SupabaseClient, p: ParsedHilol, skipIsbn: boolean, 
   const pubSlug = publisherSlug(p.publisher ?? "Hilol-Nashr");
   const { data: pubRow } = await db
     .from("publishers")
-    .upsert({ name: PUBLISHER_NAMES[pubSlug] ?? p.publisher ?? "Hilol-Nashr", slug: pubSlug }, { onConflict: "slug", ignoreDuplicates: false })
+    .upsert({ name: PUBLISHER_NAMES[pubSlug] ?? normalizeApostrophes(p.publisher ?? "Hilol-Nashr"), slug: pubSlug }, { onConflict: "slug", ignoreDuplicates: false })
     .select("id")
     .single();
   const publisherId = (pubRow?.id as number | undefined) ?? null;

@@ -3,6 +3,7 @@ import path from "node:path";
 import { PGlite, type Transaction } from "@electric-sql/pglite";
 import { pg_trgm } from "@electric-sql/pglite/contrib/pg_trgm";
 import { beforeAll, describe, expect, it } from "vitest";
+import { cleanMutolaaSlug, cleanTitle, normalizeApostrophes, saneYear, titleNoise } from "@/lib/text/clean";
 
 // Barcha migratsiyalar Supabase'ga oʻxshash PGlite bazada qoʻllanadi, soʻng ilova bajaradigan soʻrovlar
 // (PostgREST yaratadigan SQL koʻrinishida) anon / authenticated / service_role rollari bilan tekshiriladi.
@@ -281,11 +282,16 @@ describe("20261109000009: katalog filtrlari va yillik statistika", () => {
     expect(await slugs(`public.search_catalog('filtr', 'alfa', 'ru', true)`)).toEqual(["filtr-uch"]);
   });
 
-  it("publisher_book_counts: takrorsiz sanaydi", async () => {
-    const { rows } = await as("anon", null, `select slug, count::int as n from public.publisher_book_counts() where slug in ('alfa', 'beta') order by slug`);
+  it("publisher_book_counts: takrorsiz sanaydi, oʻzbekcha kitoblar alohida", async () => {
+    const { rows } = await as(
+      "anon",
+      null,
+      `select slug, count::int as n, uz_count::int as uz from public.publisher_book_counts() where slug in ('alfa', 'beta') order by slug`,
+    );
+    // Beta'dagi yagona nashr ruscha
     expect(rows).toEqual([
-      { slug: "alfa", n: 2 },
-      { slug: "beta", n: 1 },
+      { slug: "alfa", n: 2, uz: 2 },
+      { slug: "beta", n: 1, uz: 0 },
     ]);
   });
 
@@ -323,8 +329,15 @@ describe("20261109000009: katalog filtrlari va yillik statistika", () => {
 
   it("009 qayta ishga tushirilsa ham xato bermaydi", async () => {
     const f = fs.readdirSync(MIGRATIONS).find((f) => f.endsWith("_catalog_filters_year_stats.sql"))!;
+    // publisher_book_counts keyinroq (20261116000019) uz_count ustuni bilan qayta yaratilgan —
+    // 009 ning eski koʻrinishi uning ustiga yozila olmaydi, shuning uchun avval olib tashlanadi, soʻng qaytariladi
+    const later = fs.readFileSync(path.join(MIGRATIONS, "20261116000019_catalog_cleanup.sql"), "utf8");
+    const recreate = later.slice(later.indexOf("drop function if exists public.publisher_book_counts();"));
+    await db.exec("drop function public.publisher_book_counts();");
     await db.exec(fs.readFileSync(path.join(MIGRATIONS, f), "utf8"));
+    await db.exec(recreate);
     expect(await slugs(`public.search_catalog('filtr', 'beta')`)).toEqual(["filtr-uch"]);
+    expect((await as("anon", null, `select uz_count::int as uz from public.publisher_book_counts() where slug = 'alfa'`)).rows).toEqual([{ uz: 2 }]);
   });
 });
 
@@ -1048,5 +1061,101 @@ describe("hisobni oʻchirish: auth.users oʻchsa hamma shaxsiy maʼlumot oʻchad
     expect(await q1(`select review from public.user_books where id = $1`, [reviewA])).toEqual([{ review: "Menga ham yoqdi" }]);
     expect(await q1(`select 1 from public.profiles where id = $1`, [A])).toHaveLength(1);
     expect(await q1(`select 1 from public.clubs where id = $1`, [otherClub])).toHaveLength(1);
+  });
+});
+
+// Migratsiya bu yerda qayta ishga tushiriladi (iflos maʼlumot ustida) — shuning uchun fayl oxirida turadi.
+describe("20261116000019: katalogni tozalash", () => {
+  const migration = fs.readFileSync(path.join(MIGRATIONS, "20261116000019_catalog_cleanup.sql"), "utf8");
+  const q1 = async <T = Record<string, unknown>>(sql: string, params: unknown[] = []) => (await db.query<T>(sql, params)).rows;
+  const book = async (slug: string) =>
+    (await q1(`select slug, title, author_names, published_year::int as year, source_url from public.books where slug = $1`, [slug]))[0];
+  const state = () =>
+    q1(`select (select jsonb_agg(to_jsonb(b) - 'search_text' order by b.id) from public.books b) as books,
+               (select jsonb_agg(to_jsonb(r) order by r.old_slug) from public.book_redirects r) as redirects,
+               (select jsonb_agg(to_jsonb(t) order by t.id) from public.topics t) as topics`);
+
+  beforeAll(async () => {
+    await db.exec(`
+      insert into public.topics (name, slug) values ('AT', 'at'), ('Bolalarbop', 'bolalarbop'), ('Diniy-Maʼrifiy', 'diniy-marifiy');
+      insert into public.publishers (name, slug) values ('Zamon kitob', 'zamon-kitob');
+      insert into public.authors (name, slug) values ('G''ayrat Majid', 'gayrat-majid');
+      insert into public.books (slug, title, author_names, source, source_url, published_year) values
+        ('o-tgan-kunlar', 'O''tgan kunlar', 'Abdulla Qodiriy', 'mutolaa', 'https://mutolaa.com/uz/book/o-tgan-kunlar', 20241),
+        ('she-rlar-31', 'She’rlar', 'Cho\`lpon', 'mutolaa', 'https://mutolaa.com/uz/book/she-rlar-31', 126),
+        ('sherlar-31', 'Boshqa kitob', null, 'asaxiy', null, 2020),
+        ('besh-bolali-yigitcha', 'Besh bolali yigitcha (Zamon kitob)', 'Xudoyberdi To''xtaboyev', 'asaxiy', null, null),
+        ('kings-speech', 'The King''s Speech (Used)', 'Mark Logue', 'asaxiy', null, null);
+    `);
+    await db.exec(migration);
+  });
+
+  it("rukn nomlari yangilanadi, manzillari oʻzgarmaydi", async () => {
+    expect(await q1(`select slug, name from public.topics where slug in ('at', 'bolalarbop', 'diniy-marifiy') order by slug`)).toEqual([
+      { slug: "at", name: "IT va dasturlash" },
+      { slug: "bolalarbop", name: "Bolalar adabiyoti" },
+      { slug: "diniy-marifiy", name: "Diniy-maʼrifiy" },
+    ]);
+  });
+
+  it("Mutolaa kitobining manzili tozalanadi, eski manzil yoʻnaltiriladi", async () => {
+    expect(await book("otgan-kunlar")).toEqual({
+      slug: "otgan-kunlar",
+      title: "Oʻtgan kunlar",
+      author_names: "Abdulla Qodiriy",
+      year: 2024,
+      source_url: "https://mutolaa.com/uz/book/o-tgan-kunlar",
+    });
+    expect(await book("o-tgan-kunlar")).toBeUndefined();
+    // "sherlar-31" band — raqam qoʻshiladi
+    expect(await book("sherlar-31-2")).toMatchObject({ title: "Sheʼrlar", author_names: "Choʻlpon", year: null });
+    expect(await book("sherlar-31")).toMatchObject({ title: "Boshqa kitob", year: 2020 });
+    expect(
+      await q1(`select r.old_slug, b.slug from public.book_redirects r join public.books b on b.id = r.book_id where r.old_slug in ('o-tgan-kunlar', 'she-rlar-31') order by 1`),
+    ).toEqual([
+      { old_slug: "o-tgan-kunlar", slug: "otgan-kunlar" },
+      { old_slug: "she-rlar-31", slug: "sherlar-31-2" },
+    ]);
+  });
+
+  it("nomdagi doʻkon izi olib tashlanadi; oʻzbekcha boʻlmagan kitobda apostrofga tegilmaydi", async () => {
+    expect(await book("besh-bolali-yigitcha")).toMatchObject({ title: "Besh bolali yigitcha", author_names: "Xudoyberdi To'xtaboyev" });
+    expect(await book("kings-speech")).toMatchObject({ title: "The King's Speech" });
+    expect(await q1(`select name from public.authors where slug = 'gayrat-majid'`)).toEqual([{ name: "Gʻayrat Majid" }]);
+  });
+
+  it("qayta ishga tushirilsa hech narsa oʻzgarmaydi", async () => {
+    const before = await state();
+    await db.exec(migration);
+    expect(await state()).toEqual(before);
+  });
+
+  it("SQL funksiyalari lib/text/clean.ts bilan bir xil natija beradi", async () => {
+    const texts = ["O'tkan kunlar", "G‘afur G`ulom", "tog' va bog'", "She'rlar", "'Bog' kitobi", "O'Genri", "King's Landing", "Ma’naviyat", "Ўткан кунлар"];
+    for (const t of texts) {
+      expect((await q1<{ v: string }>(`select pg_temp.fix_apostrophes($1) as v`, [t]))[0].v, t).toBe(normalizeApostrophes(t));
+    }
+
+    const publishers = await q1<{ name: string; slug: string }>(`select name, slug from public.publishers`);
+    const noise = titleNoise(publishers.flatMap((p) => [p.name, p.slug]));
+    const titles = ["Besh bolali yigitcha (Global books)", "Sarmoyador [Asaxiy]", "Kitob (Yumshoq muqova) 2-nashr", "Война и мир (мягкая) (Used)", "Hikmatlar (A5)", "Roman (zamon-kitob), 1-jild", "(Used)"];
+    for (const t of titles) {
+      expect((await q1<{ v: string }>(`select pg_temp.clean_title($1, pg_temp.title_noise()) as v`, [t]))[0].v, t).toBe(cleanTitle(t, noise));
+    }
+
+    const slugs: [string, string][] = [
+      ["o-tkan-kunlar", "Oʻtkan kunlar"],
+      ["she-rlar-31", "Sheʼrlar"],
+      ["uyg-onish-abu-ali-ibn-sino", "Uygʻonish. Abu Ali ibn Sino"],
+      ["boshqa-nom", "Oʻtkan kunlar"],
+      ["o-tkan-kunlarim", "Oʻtkan kunlar"],
+    ];
+    for (const [slug, title] of slugs) {
+      expect((await q1<{ v: string }>(`select pg_temp.clean_mutolaa_slug($1, $2) as v`, [slug, title]))[0].v, slug).toBe(cleanMutolaaSlug(slug, title));
+    }
+
+    for (const year of [2024, 20241, 126, 1898, 20991, 2099]) {
+      expect((await q1<{ v: number | null }>(`select pg_temp.sane_year($1)::int as v`, [year]))[0].v, String(year)).toBe(saneYear(year));
+    }
   });
 });
