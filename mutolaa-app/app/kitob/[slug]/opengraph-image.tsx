@@ -8,7 +8,7 @@ import { site } from "@/lib/site";
 
 export const alt = "Kitob muqovasi va nomi";
 export const size = { width: 1200, height: 630 };
-export const contentType = "image/png";
+export const contentType = "image/jpeg";
 
 const C = { bg: "#faf7f2", text: "#1f1b16", muted: "#6b6358", accent: "#1f6f5c", soft: "#e2f0eb" };
 
@@ -39,7 +39,7 @@ export default async function Image({ params }: { params: Promise<{ slug: string
       ].filter(Boolean)
     : [];
 
-  return new ImageResponse(
+  const png = await new ImageResponse(
     (
       <div style={{ display: "flex", width: "100%", height: "100%", background: C.bg, padding: 64, gap: 56, alignItems: "center" }}>
         {cover ? (
@@ -65,5 +65,16 @@ export default async function Image({ params }: { params: Promise<{ slug: string
       </div>
     ),
     size,
-  );
+  ).arrayBuffer();
+
+  // Kutubxona faqat PNG beradi (~430 KB) — JPEG besh-olti barobar yengil, trafik limitini tejaydi.
+  // Rasm chizish serverda qimmat (muqovani yuklash, oʻgirish, chizish) — CDN bir hafta saqlasin,
+  // aks holda har bir ulashish va har bir robot uni qaytadan chizdiradi.
+  const jpeg = await sharp(Buffer.from(png)).jpeg({ quality: 84, mozjpeg: true }).toBuffer();
+  return new Response(new Uint8Array(jpeg), {
+    headers: {
+      "Content-Type": contentType,
+      "Cache-Control": "public, max-age=3600, s-maxage=604800, stale-while-revalidate=86400",
+    },
+  });
 }

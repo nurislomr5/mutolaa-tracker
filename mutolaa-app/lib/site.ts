@@ -24,7 +24,7 @@ export function siteUrl() {
 }
 
 // Saytning eski manzillari: asosiy domen boshqa boʻlsa, shu yerga kelgan sahifa soʻrovlari oʻsha domenga koʻchiriladi
-const LEGACY_HOSTS = ["mutolaa-tracker.vercel.app"];
+export const LEGACY_HOSTS = ["mutolaa-tracker.vercel.app"];
 
 // Soʻrov boshqa manzilga yoʻnaltirilishi kerak boʻlsa — oʻsha manzil (toʻliq yoki nisbiy), aks holda null.
 //   * eski domen → asosiy domen (API'dan tashqari: bot webhook va cron eski manzilda ham ishlayveradi);
