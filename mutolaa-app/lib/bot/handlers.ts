@@ -7,6 +7,7 @@ import { applyProgress, setStatusFor } from "@/lib/shelf-ops";
 import { addDays, computeStreaks, dayKey } from "@/lib/stats-utils";
 import { todayInTashkent, type ProgressUnit, type ReadingFormat, type ShelfStatus } from "@/lib/shelf-types";
 import { createAdminClient } from "@/lib/supabase/admin";
+import { uzNormalize } from "@/lib/text/normalize";
 import { createLoginLink } from "@/lib/bot/login";
 import { readIsbnFromImage } from "@/lib/bot/barcode";
 import { fetchExternalIsbnMeta, isbnVariants } from "@/lib/isbn";
@@ -161,7 +162,7 @@ async function sendSearch(db: SupabaseClient, chatId: number, query: string) {
     await sendMessage(chatId, t.searchHint);
     return "search_empty_query";
   }
-  const { data } = await db.rpc("search_books", { q }).select("id, title, author_names").limit(5);
+  const { data } = await db.rpc("search_books", { q: uzNormalize(q) }).select("id, title, author_names").limit(5);
   const books = (data ?? []) as { id: number; title: string; author_names: string | null }[];
   if (!books.length) {
     await sendMessage(chatId, t.searchNone(esc(q)));
@@ -410,7 +411,7 @@ export async function handleUpdate(update: TgUpdate): Promise<string> {
     const iq = update.inline_query;
     const q = iq.query.trim();
     const { data } = q
-      ? await db.rpc("search_books", { q }).select("id, slug, title, author_names, cover_url, mutolaa_rating").limit(10)
+      ? await db.rpc("search_books", { q: uzNormalize(q) }).select("id, slug, title, author_names, cover_url, mutolaa_rating").limit(10)
       : await db
           .from("books")
           .select("id, slug, title, author_names, cover_url, mutolaa_rating")

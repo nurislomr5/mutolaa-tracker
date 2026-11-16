@@ -5,6 +5,7 @@ import { redirect } from "next/navigation";
 import { z } from "zod";
 import { uz } from "@/lib/i18n/uz";
 import { createServerSupabase, getSessionUser } from "@/lib/supabase/server";
+import { uzNormalize } from "@/lib/text/normalize";
 
 // Kitobxonlik klublari. Ruxsatlar bazada (RLS va funksiyalar, 20261111000013) — bu yerda faqat
 // validatsiya, foydalanuvchiga tushunarli xabar va sahifani yangilash.
@@ -118,7 +119,7 @@ export async function searchClubBooks(q: string) {
   const query = String(q ?? "").trim().slice(0, 100);
   if (query.length < 2 || !(await getSessionUser())) return [];
   const { data } = await (await createServerSupabase())
-    .rpc("search_books", { q: query })
+    .rpc("search_books", { q: uzNormalize(query) })
     .select("id, title, author_names, cover_url")
     .limit(8);
   return (data ?? []) as { id: number; title: string; author_names: string | null; cover_url: string | null }[];

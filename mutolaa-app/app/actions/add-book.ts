@@ -64,7 +64,7 @@ export async function addBook(_prev: AddBookState, formData: FormData): Promise<
     const { data: exact } = await admin.from("books").select(BOOK_CARD).eq("search_text", uzNormalize(`${input.title} ${authors.join(", ")}`)).limit(3);
     for (const b of exact ?? []) found.set(b.slug, b);
     const normTitle = uzNormalize(input.title);
-    const { data: similar } = await admin.rpc("search_books", { q: `${input.title} ${authors[0]}` }).select(`${BOOK_CARD}, search_text`).limit(5);
+    const { data: similar } = await admin.rpc("search_books", { q: uzNormalize(`${input.title} ${authors[0]}`) }).select(`${BOOK_CARD}, search_text`).limit(5);
     for (const b of (similar ?? []) as (DuplicateBook & { search_text: string })[]) {
       if (normTitle.length >= 3 && b.search_text.includes(normTitle)) found.set(b.slug, { slug: b.slug, title: b.title, author_names: b.author_names, cover_url: b.cover_url });
     }

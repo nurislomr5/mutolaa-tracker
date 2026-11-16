@@ -12,7 +12,7 @@ import {
   titleNoise,
 } from "@/lib/text/clean";
 import { slugify, uzNormalize } from "@/lib/text/normalize";
-import { latinToCyrillic } from "@/lib/translit";
+import { latinToCyrillic, latinToNewLatin } from "@/lib/translit";
 
 describe("uzNormalize (SQL uz_normalize bilan bir xil boʻlishi shart)", () => {
   it("lotin, kirill va apostrof turlaridan qatʼi nazar bir xil natija", () => {
@@ -24,6 +24,15 @@ describe("uzNormalize (SQL uz_normalize bilan bir xil boʻlishi shart)", () => {
     expect(uzNormalize("Ер юзи")).toBe("yer yuzi");
     expect(uzNormalize("Шайх Ғафур Ғулом")).toBe("shayx gafur gulom");
     expect(uzNormalize("Ҳаёт")).toBe("hayot");
+  });
+
+  it("yangi lotin alifbosi: ö = oʻ, ğ = gʻ, ş = sh, ç = ch", () => {
+    expect(uzNormalize("Ötkan kunlar")).toBe("otkan kunlar");
+    expect(uzNormalize("ÖTKAN KUNLAR")).toBe("otkan kunlar");
+    expect(uzNormalize("O\u0308tkan kunlar")).toBe("otkan kunlar");
+    expect(uzNormalize("Şayx Ğafur Ğulom")).toBe(uzNormalize("Shayx Gʻafur Gʻulom"));
+    expect(uzNormalize("Çölpon")).toBe(uzNormalize("Choʻlpon"));
+    expect(slugify("Odam böliş qiyin")).toBe("odam-bolish-qiyin");
   });
 
   it("boʻsh qiymatlar", () => {
@@ -49,6 +58,12 @@ describe("latinToCyrillic", () => {
     ["Kitoblar", "Китоблар"],
   ])("%s -> %s", (latin, cyr) => {
     expect(latinToCyrillic(latin)).toBe(cyr);
+  });
+
+  it("yangi alifboda yozilgan matn ham kirillga oʻtadi", () => {
+    expect(latinToCyrillic("Ötkan kunlar")).toBe("Ўткан кунлар");
+    expect(latinToCyrillic("Şayx Ğafur")).toBe("Шайх Ғафур");
+    expect(latinToCyrillic("Çölpon, yöq")).toBe("Чўлпон, йўқ");
   });
 
   it("havola, email va @username oʻgirilmaydi", () => {
@@ -120,6 +135,38 @@ describe("cleanTitle", () => {
     expect(inSql.length).toBeGreaterThan(20);
     expect(inSql).toEqual([...STATIC_TITLE_NOISE].sort());
     for (const n of STATIC_TITLE_NOISE) expect(uzNormalize(n), n).toBe(n);
+  });
+});
+
+describe("latinToNewLatin (amaldagi lotin -> yangi alifbo)", () => {
+  it.each([
+    ["Oʻtkan kunlar", "Ötkan kunlar"],
+    ["O'tkan kunlar", "Ötkan kunlar"],
+    ["Gʻafur Gʻulom", "Ğafur Ğulom"],
+    ["Sharq yulduzi", "Şarq yulduzi"],
+    ["SHARQ", "ŞARQ"],
+    ["Choʻlpon", "Çölpon"],
+    ["Odam boʻlish qiyin", "Odam böliş qiyin"],
+    ["togʻ va bogʻ", "toğ va boğ"],
+    ["Mehrobdan chayon", "Mehrobdan çayon"],
+    ["Isʼhoq, maʼlumot", "Isʼhoq, maʼlumot"],
+    ["Kitoblar", "Kitoblar"],
+    ["Ўткан кунлар", "Ўткан кунлар"],
+  ])("%s -> %s", (classic, modern) => {
+    expect(latinToNewLatin(classic)).toBe(modern);
+  });
+
+  it("havola, email va @username oʻgirilmaydi", () => {
+    expect(latinToNewLatin("https://xatchop.uz/kitob/shum-bola")).toBe("https://xatchop.uz/kitob/shum-bola");
+    expect(latinToNewLatin("@xatchop_uz_bot")).toBe("@xatchop_uz_bot");
+  });
+
+  it("qayta oʻgirilsa oʻzgarmaydi va amaldagi yozuvga aynan qaytadi", () => {
+    for (const text of ["Oʻtkan kunlar", "Shayx Gʻafur Gʻulom", "Choʻl burguti", "Odam boʻlish qiyin"]) {
+      const modern = latinToNewLatin(text);
+      expect(latinToNewLatin(modern)).toBe(modern);
+      expect(classicUzbekLatin(modern)).toBe(text);
+    }
   });
 });
 

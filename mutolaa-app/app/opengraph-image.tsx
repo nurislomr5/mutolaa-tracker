@@ -15,7 +15,7 @@ export default function Image() {
           <div style={{ display: "flex", width: 72, height: 72, borderRadius: 16, background: "#1f6f5c" }} />
           <span style={{ fontSize: 64, fontWeight: 700, color: "#1f1b16" }}>{site.name}</span>
         </div>
-        <div style={{ fontSize: 56, fontWeight: 700, color: "#1f1b16", lineHeight: 1.15, maxWidth: 940 }}>Oʻqigan kitoblaringiz va olgan xulosalaringiz bir joyda yoʻqolmaydi</div>
+        <div style={{ fontSize: 56, fontWeight: 700, color: "#1f1b16", lineHeight: 1.15, maxWidth: 940 }}>Oʻqigan kitoblaringiz va olgan xulosalaringiz bir joyda saqlanadi</div>
         <div style={{ fontSize: 32, color: "#6b6358", maxWidth: 960 }}>
           11 mingdan ortiq bosma, elektron va audio kitob. Shaxsiy javon, mutolaa hisobi, qaydlar va statistika oʻzbek tilida.
         </div>

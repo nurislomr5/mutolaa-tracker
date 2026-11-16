@@ -4,6 +4,7 @@ import { PGlite, type Transaction } from "@electric-sql/pglite";
 import { pg_trgm } from "@electric-sql/pglite/contrib/pg_trgm";
 import { beforeAll, describe, expect, it } from "vitest";
 import { cleanMutolaaSlug, cleanTitle, normalizeApostrophes, saneYear, titleNoise } from "@/lib/text/clean";
+import { uzNormalize } from "@/lib/text/normalize";
 
 // Barcha migratsiyalar Supabase'ga oʻxshash PGlite bazada qoʻllanadi, soʻng ilova bajaradigan soʻrovlar
 // (PostgREST yaratadigan SQL koʻrinishida) anon / authenticated / service_role rollari bilan tekshiriladi.
@@ -1157,5 +1158,42 @@ describe("20261116000019: katalogni tozalash", () => {
     for (const year of [2024, 20241, 126, 1898, 20991, 2099]) {
       expect((await q1<{ v: number | null }>(`select pg_temp.sane_year($1)::int as v`, [year]))[0].v, String(year)).toBe(saneYear(year));
     }
+  });
+});
+
+describe("20261117000020: qidiruv yangi lotin alifbosida", () => {
+  const migration = fs.readFileSync(path.join(MIGRATIONS, "20261117000020_new_latin_search.sql"), "utf8");
+  const q1 = async <T = Record<string, unknown>>(sql: string, params: unknown[] = []) => (await db.query<T>(sql, params)).rows;
+  const norm = async (text: string) => (await q1<{ v: string }>(`select public.uz_normalize($1) as v`, [text]))[0].v;
+
+  it("SQL uz_normalize lib/text/normalize.ts bilan bir xil natija beradi", async () => {
+    const texts = ["Ötkan kunlar", "ÖTKAN KUNLAR", "Oʻtkan kunlar", "Ўткан кунлар", "Şayx Ğafur Ğulom", "Çölpon", "ÇÖL BURGUTI", "Odam böliş qiyin", "Ер юзи", "maʼlumot"];
+    for (const t of texts) expect(await norm(t), t).toBe(uzNormalize(t));
+    expect(await norm("Ötkan kunlar")).toBe("otkan kunlar");
+  });
+
+  it("eski qidiruv matni yangilanadi, yangilanish vaqti oʻzgarmaydi; qayta ishga tushirsa boʻladi", async () => {
+    // eski funksiya bilan saqlangan qatorni tiklash: 20261102000002 dagi taʼrif
+    const core = fs.readFileSync(path.join(MIGRATIONS, "20261102000002_core_schema.sql"), "utf8");
+    const start = core.indexOf("create or replace function public.uz_normalize");
+    await db.exec(core.slice(start, core.indexOf("$$;", start) + 3));
+    await db.exec(`insert into public.books (slug, title, author_names, source) values ('icimizdeki-seytan', 'İçimizdeki Şeytan', 'Sabahattin Ali', 'user')`);
+    const before = (await q1<{ search_text: string; updated_at: string }>(`select search_text, updated_at::text from public.books where slug = 'icimizdeki-seytan'`))[0];
+    expect(before.search_text).not.toContain("sheytan");
+
+    await db.exec(migration);
+    const after = (await q1<{ search_text: string; updated_at: string }>(`select search_text, updated_at::text from public.books where slug = 'icimizdeki-seytan'`))[0];
+    expect(after.search_text).toContain("sheytan");
+    expect(after.updated_at).toBe(before.updated_at);
+    expect(await q1(`select count(*)::int as n from public.books where search_text is distinct from public.uz_normalize(coalesce(title, '') || ' ' || coalesce(author_names, ''))`)).toEqual([{ n: 0 }]);
+
+    await db.exec(migration);
+    expect((await q1<{ search_text: string }>(`select search_text from public.books where slug = 'icimizdeki-seytan'`))[0].search_text).toBe(after.search_text);
+  });
+
+  it("yangi alifboda yozilgan soʻrov amaldagi yozuvdagi kitobni topadi", async () => {
+    await db.exec(`insert into public.books (slug, title, author_names, source) values ('choliqushi', 'Choʻliqushi', 'Rashod Nuri Guntekin', 'user')`);
+    const found = await q1<{ slug: string }>(`select slug from public.books where search_text like '%' || public.uz_normalize($1) || '%'`, ["Çöliquşi"]);
+    expect(found.map((r) => r.slug)).toContain("choliqushi");
   });
 });

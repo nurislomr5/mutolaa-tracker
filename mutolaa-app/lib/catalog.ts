@@ -1,6 +1,7 @@
 import { cacheLife, cacheTag } from "next/cache";
 import { hasCleanTitle, isCyrillic, orderPublishers, pickDiverse, uniqueByTitle } from "@/lib/showcase";
 import { createPublicClient } from "@/lib/supabase/public";
+import { uzNormalize } from "@/lib/text/normalize";
 
 // Katalog maʼlumotlari kamdan-kam oʻzgaradi (import haftasiga bir marta) — soatlab keshlanadi.
 // Xato boʻlsa throw qilamiz: 'use cache' xatoni keshlamaydi, sahifadagi error.tsx koʻrsatadi.
@@ -118,7 +119,7 @@ export async function getCatalog({ q = "", topic, publisher, format, script, siz
   } else {
     // nashriyot, til va "sotuvda bor" — search_catalog ichida (nashriyot kitobning nashrlari orqali ham)
     query = db
-      .rpc("search_catalog", { q, p_publisher: publisher ?? null, p_lang: lang ?? null, p_in_stock: Boolean(inStock) }, { count: "exact" })
+      .rpc("search_catalog", { q: uzNormalize(q), p_publisher: publisher ?? null, p_lang: lang ?? null, p_in_stock: Boolean(inStock) }, { count: "exact" })
       .select(columns);
   }
 

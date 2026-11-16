@@ -1,26 +1,38 @@
 "use client";
 
-import { useEffect, useState } from "react";
-import { latinToCyrillic } from "@/lib/translit";
+import { useEffect, useRef, useState } from "react";
+import { uz } from "@/lib/i18n/uz";
+import { latinToCyrillic, latinToNewLatin } from "@/lib/translit";
+import { cn } from "@/lib/utils";
 
-// Kirill interfeysi: sahifadagi barcha matn brauzerda lotindan kirillga oʻgiriladi (server va kesh oʻzgarmaydi).
+// Yozuv tanlash: amaldagi lotin (oʻ, gʻ, sh, ch), yangi lotin alifbosi (ö, ğ, ş, ç) yoki kirill.
+// Sahifadagi barcha matn brauzerda amaldagi lotindan tanlangan yozuvga oʻgiriladi (server va kesh oʻzgarmaydi).
 // MutationObserver keyin qoʻshilgan yoki React yangilagan matnlarni ham oʻgiradi.
 // Input qiymatlari, kod va [data-no-translit] ichidagi matnlarga tegilmaydi.
+
+type Script = "latn" | "yangi" | "cyrl";
 
 const STORAGE_KEY = "script";
 const ATTRS = ["placeholder", "title", "aria-label"];
 const SKIP = "script,style,noscript,code,pre,textarea,[data-no-translit]";
+const CONVERTERS: Record<Exclude<Script, "latn">, (text: string) => string> = { yangi: latinToNewLatin, cyrl: latinToCyrillic };
+const OPTIONS: { value: Script; sample: string }[] = [
+  { value: "latn", sample: "oʻ, gʻ, sh, ch" },
+  { value: "yangi", sample: "ö, ğ, ş, ç" },
+  { value: "cyrl", sample: "ў, ғ, ш, ч" },
+];
 
 const written = new WeakMap<Node, string>(); // biz yozgan qiymat — oʻz oʻzgarishlarimizni qayta ishlamaslik uchun
 const writtenAttrs = new WeakMap<Element, Record<string, string>>();
 let observer: MutationObserver | null = null;
+let convert: (text: string) => string = (text) => text;
 
 function convertText(node: Text) {
   const parent = node.parentElement;
   if (!parent || parent.closest(SKIP)) return;
   const current = node.nodeValue ?? "";
   if (written.get(node) === current) return;
-  const next = latinToCyrillic(current);
+  const next = convert(current);
   written.set(node, next);
   if (next !== current) node.nodeValue = next;
 }
@@ -31,7 +43,7 @@ function convertAttrs(el: Element) {
   for (const attr of ATTRS) {
     const value = el.getAttribute(attr);
     if (!value || done[attr] === value) continue;
-    const next = latinToCyrillic(value);
+    const next = convert(value);
     done[attr] = next;
     if (next !== value) el.setAttribute(attr, next);
   }
@@ -49,9 +61,10 @@ function walk(root: Node) {
   }
 }
 
-function startCyrillic() {
+function start(script: Exclude<Script, "latn">) {
   if (observer) return;
-  document.documentElement.lang = "uz-Cyrl";
+  convert = CONVERTERS[script];
+  if (script === "cyrl") document.documentElement.lang = "uz-Cyrl";
   walk(document.documentElement);
   observer = new MutationObserver((records) => {
     for (const r of records) {
@@ -69,23 +82,27 @@ function startCyrillic() {
   });
 }
 
-function readStored() {
+function readStored(): Script {
   try {
-    return localStorage.getItem(STORAGE_KEY) === "cyrl";
+    const value = localStorage.getItem(STORAGE_KEY);
+    return value === "cyrl" || value === "yangi" ? value : "latn";
   } catch {
-    return false;
+    return "latn";
   }
 }
 
 export function ScriptToggle() {
-  const [cyrillic, setCyrillic] = useState(false);
+  const [script, setScript] = useState<Script>("latn");
+  const [open, setOpen] = useState(false);
+  const root = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
-    if (!readStored()) return;
+    const stored = readStored();
+    if (stored === "latn") return;
     // Oqimli (Suspense) kontent gidratsiyasi tugashini kutamiz — aks holda React matn farqini koʻradi
     const run = () => {
-      setCyrillic(true);
-      startCyrillic();
+      setScript(stored);
+      start(stored);
     };
     if (document.readyState === "complete") {
       const id = setTimeout(run, 300);
@@ -96,32 +113,76 @@ export function ScriptToggle() {
     return () => window.removeEventListener("load", onLoad);
   }, []);
 
-  function toggle() {
-    const next = !cyrillic;
+  useEffect(() => {
+    if (!open) return;
+    const onDown = (e: PointerEvent) => {
+      if (!root.current?.contains(e.target as Node)) setOpen(false);
+    };
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === "Escape") setOpen(false);
+    };
+    document.addEventListener("pointerdown", onDown);
+    document.addEventListener("keydown", onKey);
+    return () => {
+      document.removeEventListener("pointerdown", onDown);
+      document.removeEventListener("keydown", onKey);
+    };
+  }, [open]);
+
+  function choose(next: Script) {
+    setOpen(false);
+    if (next === script) return;
     try {
-      localStorage.setItem(STORAGE_KEY, next ? "cyrl" : "latn");
+      localStorage.setItem(STORAGE_KEY, next);
     } catch {
       // xotira yopiq — faqat shu sahifa uchun
     }
-    if (next) {
-      setCyrillic(true);
-      startCyrillic();
+    if (script === "latn" && next !== "latn") {
+      setScript(next);
+      start(next);
     } else {
-      // lotinga qaytish: asl matnni React'dan qayta olish eng ishonchli yoʻl
+      // matn allaqachon oʻgirilgan: asl holini React'dan qayta olish eng ishonchli yoʻl
       location.reload();
     }
   }
 
+  const t = uz.script;
   return (
-    <button
-      type="button"
-      onClick={toggle}
-      data-no-translit
-      aria-label={cyrillic ? "Lotin yozuviga oʻtish" : "Кирилл ёзувига ўтиш"}
-      title={cyrillic ? "Lotin yozuviga oʻtish" : "Кирилл ёзувига ўтиш"}
-      className="inline-flex h-9 items-center justify-center rounded-lg px-2 text-sm font-medium text-muted transition-colors hover:bg-surface-2 hover:text-text"
-    >
-      {cyrillic ? "Lotin" : "Кирилл"}
-    </button>
+    <div ref={root} className="relative" data-no-translit>
+      <button
+        type="button"
+        onClick={() => setOpen((v) => !v)}
+        aria-haspopup="menu"
+        aria-expanded={open}
+        aria-label={t.label}
+        title={t.label}
+        className="inline-flex h-9 items-center justify-center gap-1 rounded-lg px-2 text-sm font-medium text-muted transition-colors hover:bg-surface-2 hover:text-text"
+      >
+        {t[script]}
+        <svg className="h-3.5 w-3.5" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.8" aria-hidden>
+          <path d="m4 6 4 4 4-4" strokeLinecap="round" strokeLinejoin="round" />
+        </svg>
+      </button>
+      {open && (
+        <div role="menu" className="absolute right-0 top-full z-40 mt-1 w-52 rounded-xl border border-border bg-surface p-1 shadow-lg">
+          {OPTIONS.map((o) => (
+            <button
+              key={o.value}
+              type="button"
+              role="menuitemradio"
+              aria-checked={o.value === script}
+              onClick={() => choose(o.value)}
+              className={cn(
+                "flex w-full items-baseline justify-between gap-3 rounded-lg px-3 py-2 text-left text-sm transition-colors hover:bg-surface-2",
+                o.value === script ? "font-semibold text-accent" : "text-text",
+              )}
+            >
+              {t[o.value]}
+              <span className="text-xs font-normal text-muted">{o.sample}</span>
+            </button>
+          ))}
+        </div>
+      )}
+    </div>
   );
 }

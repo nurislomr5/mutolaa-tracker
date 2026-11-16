@@ -1,7 +1,9 @@
+import Form from "next/form";
 import Link from "next/link";
 import { Container } from "@/components/ui/container";
 import { Card, CardTitle } from "@/components/ui/card";
-import { buttonClasses } from "@/components/ui/button";
+import { Button, buttonClasses } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
 import { BookGrid } from "@/components/book/book-card";
 import { getNewPaperBooks, getPopularBooks, getPublishers, getTopics } from "@/lib/catalog";
 import { Suspense } from "react";
@@ -116,10 +118,7 @@ async function Personal() {
       {recommended.length > 0 && (
         <Container className="pt-10">
           <div className="mb-5 flex items-baseline justify-between gap-4">
-            <div>
-              <h2 className="font-serif text-2xl font-semibold">{t.forYou}</h2>
-              <p className="text-sm text-muted">{t.forYouHint}</p>
-            </div>
+            <h2 className="font-serif text-2xl font-semibold">{t.forYou}</h2>
             <Link href="/tanishuv" className="shrink-0 text-sm text-accent hover:underline">
               {t.editInterests}
             </Link>
@@ -163,10 +162,7 @@ async function Popular() {
       {newBooks.length > 0 && (
         <section className="mb-14">
           <div className="mb-5 flex items-baseline justify-between gap-4">
-            <div>
-              <h2 className="font-serif text-2xl font-semibold">{uz.publishers.newBooks}</h2>
-              <p className="text-sm text-muted">{uz.publishers.newBooksHint}</p>
-            </div>
+            <h2 className="font-serif text-2xl font-semibold">{uz.publishers.newBooks}</h2>
             <Link href="/kitoblar?format=paper&til=uz&sort=new" className="shrink-0 text-sm text-accent hover:underline">
               {uz.popular.seeAll}
             </Link>
@@ -236,7 +232,19 @@ export default function HomePage() {
           <p className="mb-3 text-sm font-medium text-accent">{t.eyebrow}</p>
           <h1 className="max-w-3xl font-serif text-4xl font-semibold leading-tight sm:text-5xl">{t.title}</h1>
           <p className="mt-5 max-w-2xl text-lg text-muted">{t.subtitle}</p>
-          <div className="mt-8 flex flex-wrap gap-3">
+          <Form action="/kitoblar" className="mt-8 flex max-w-xl gap-2">
+            <Input
+              name="q"
+              type="search"
+              placeholder={uz.catalog.searchPlaceholder}
+              aria-label={uz.catalog.searchPlaceholder}
+              className="h-12 flex-1 text-base"
+            />
+            <Button type="submit" size="lg" variant="secondary">
+              {uz.catalog.search}
+            </Button>
+          </Form>
+          <div className="mt-4 flex flex-wrap gap-3">
             <Link href="/kitoblar" className={buttonClasses({ size: "lg" })}>
               {t.ctaCatalog}
             </Link>
@@ -244,7 +252,6 @@ export default function HomePage() {
               {t.ctaSignIn}
             </Link>
           </div>
-          <p className="mt-6 text-sm text-muted">{t.searchHint}</p>
         </Container>
       </section>
 

@@ -28,6 +28,13 @@ export const uz = {
   theme: {
     toggle: "Yorugʻ / qorongʻi rejim",
   },
+  // Yozuv tanlash (components/script-toggle.tsx): nomlar oʻz yozuvida, ular oʻgirilmaydi
+  script: {
+    label: "Yozuv",
+    latn: "Lotin",
+    yangi: "Yangi lotin",
+    cyrl: "Кирилл",
+  },
   status: {
     want: "Oʻqimoqchiman",
     reading: "Oʻqiyapman",
@@ -48,7 +55,7 @@ export const uz = {
   },
   home: {
     eyebrow: "Shaxsiy mutolaa kundaligi va kitoblar katalogi",
-    title: "Oʻqigan kitoblaringiz va olgan xulosalaringiz bir joyda yoʻqolmaydi",
+    title: "Oʻqigan kitoblaringiz va olgan xulosalaringiz bir joyda saqlanadi",
     subtitle:
       "Oʻzbek nashriyotlarining bosma kitoblari hamda «Mutolaa» ilovasidagi audio va elektron asarlar yagona katalogda. Shaxsiy javoningizni yigʻing, kunlik oʻqish koʻrsatkichini belgilang va eng muhim qaydlarni saqlab boring.",
     ctaCatalog: "Kitoblarni koʻrish",
@@ -80,7 +87,6 @@ export const uz = {
         body: "Botga ovozli yoki yozma xabar yuborishingiz kifoya: necha bet oʻqiganingiz va kitobdan olgan qaydlaringiz avtomatik kundalikka tushadi.",
       },
     ],
-    searchHint: "Qidiruv lotin va kirillda bir xil ishlaydi: «Oʻtkan kunlar» = «Ўткан кунлар».",
     // kirgan foydalanuvchining bosh sahifasi
     greeting: (name: string) => `Assalomu alaykum, ${name}!`,
     greetingNoName: "Assalomu alaykum!",
@@ -91,7 +97,6 @@ export const uz = {
     onboardingBody: "Qiziqqan ruknlaringizni belgilasangiz, bosh sahifada sizga mos tavsiyalar chiqadi. Bunga bir daqiqa ham ketmaydi.",
     onboardingCta: "Ruknlarni tanlash",
     forYou: "Siz uchun",
-    forYouHint: "Tanlagan ruknlaringiz va javoningizdagi kitoblar asosida.",
     editInterests: "Qiziqishlarni oʻzgartirish",
     friendsTitle: "Doʻstlaringiz nima oʻqiyapti",
     friendsAll: "Lenta →",
@@ -111,7 +116,7 @@ export const uz = {
   catalog: {
     title: "Kitoblar",
     description: "Bosma, elektron va audio kitoblarni nashriyot, muallif yoki rukn boʻyicha toping.",
-    searchPlaceholder: "Kitob yoki muallif nomi (lotin yoki kirillda)",
+    searchPlaceholder: "Kitob yoki muallif nomi",
     search: "Qidirish",
     searchButton: "Qidirish",
     allTopics: "Barcha ruknlar",
@@ -299,7 +304,6 @@ export const uz = {
     books: (n: string) => `${n} ta kitob`,
     allPublishers: "Barcha nashriyotlar →",
     newBooks: "Yangi kitoblar",
-    newBooksHint: "Nashriyotlardan yangi chiqqan bosma kitoblar",
   },
   popular: {
     title: "Eng koʻp oʻqilayotganlar",
